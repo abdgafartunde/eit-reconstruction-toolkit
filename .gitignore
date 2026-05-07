@@ -11,6 +11,7 @@ __pycache__/
 build/
 develop-eggs/
 dist/
+site/
 downloads/
 eggs/
 .eggs/
@@ -216,3 +217,28 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# ── eitkit project-specific ───────────────────────────────────────────────
+
+# Generated verification / script outputs
+scripts/*.png
+scripts/*.pdf
+
+# Notebook output artefacts (keep .ipynb source, ignore checkpoint dirs)
+examples/.ipynb_checkpoints/
+**/.ipynb_checkpoints/
+
+# Data files that may be generated during experiments
+data/
+*.npy
+*.npz
+*.h5
+*.hdf5
+*.mat
+
+# Profiling output
+*.prof
+*.lprof
+
+# macOS
+.DS_Store
