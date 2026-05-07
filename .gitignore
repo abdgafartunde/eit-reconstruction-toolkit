@@ -238,6 +238,14 @@ data/
 
 # Profiling output
 *.prof
+
+# Internal planning / AI-assistant context files (kept locally, not in repo)
+CLAUDE.md
+PROPOSAL.md
+AGENTS.md
+.claude/
+.cursor/
+instructions.txt
 *.lprof
 
 # macOS
