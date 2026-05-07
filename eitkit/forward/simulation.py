@@ -30,11 +30,11 @@ import numpy as np
 import scipy.sparse as sp
 from numpy.typing import NDArray
 
-from eitkit.mesh.mesh import Mesh
-from eitkit.mesh.electrode_placement import ElectrodeConfig
 from eitkit.forward.fem_assembler import assemble_K
 from eitkit.forward.gap_model import build_load_vector
 from eitkit.forward.solver import apply_dirichlet_bc, pick_ground_node
+from eitkit.mesh.electrode_placement import ElectrodeConfig
+from eitkit.mesh.mesh import Mesh
 
 __all__ = ["simulate"]
 
@@ -103,13 +103,13 @@ def simulate(
     # splu() factorises each modified K once; all L drive steps then use
     # a cheap triangular back-substitution instead of a full LU each time.
     g_node = pick_ground_node(mesh)
-    K_bc  = apply_dirichlet_bc(assemble_K(mesh, sigma),      g_node).tocsc()
+    K_bc = apply_dirichlet_bc(assemble_K(mesh, sigma), g_node).tocsc()
     K0_bc = apply_dirichlet_bc(assemble_K(mesh, sigma0_arr), g_node).tocsc()
-    lu     = sp.linalg.splu(K_bc)
-    lu0    = sp.linalg.splu(K0_bc)
+    lu = sp.linalg.splu(K_bc)
+    lu0 = sp.linalg.splu(K0_bc)
 
     # Map electrode index → mesh node index
-    el_nodes = elec_config.node_indices   # shape (L,)
+    el_nodes = elec_config.node_indices  # shape (L,)
 
     # Pre-allocate output
     P = len(meas_pairs)
@@ -117,22 +117,22 @@ def simulate(
 
     # Solve per drive step (cheap back-substitution, not full factorisation)
     n_drive = len(drive_pairs)
-    U  = np.empty((n_drive, mesh.n_nodes), dtype=np.float64)
+    U = np.empty((n_drive, mesh.n_nodes), dtype=np.float64)
     U0 = np.empty((n_drive, mesh.n_nodes), dtype=np.float64)
 
     for k, dp in enumerate(drive_pairs):
         f = build_load_vector(mesh.n_nodes, elec_config, dp, current)
-        f[g_node] = 0.0                     # enforce zero RHS at ground node
-        U[k]  = lu.solve(f)
+        f[g_node] = 0.0  # enforce zero RHS at ground node
+        U[k] = lu.solve(f)
         U0[k] = lu0.solve(f)
 
     # Extract electrode voltages and form differences
     for i, (k, plus_el, minus_el) in enumerate(meas_pairs):
         k = int(k)
-        plus_node  = int(el_nodes[int(plus_el)])
+        plus_node = int(el_nodes[int(plus_el)])
         minus_node = int(el_nodes[int(minus_el)])
 
-        v_sigma  = U[k,  plus_node] - U[k,  minus_node]
+        v_sigma = U[k, plus_node] - U[k, minus_node]
         v_sigma0 = U0[k, plus_node] - U0[k, minus_node]
         dV[i] = v_sigma - v_sigma0
 

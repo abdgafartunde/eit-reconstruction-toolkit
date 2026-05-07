@@ -66,9 +66,7 @@ class ElectrodeConfig:
         object.__setattr__(
             self, "node_indices", np.asarray(self.node_indices, dtype=np.int32)
         )
-        object.__setattr__(
-            self, "angles", np.asarray(self.angles, dtype=np.float64)
-        )
+        object.__setattr__(self, "angles", np.asarray(self.angles, dtype=np.float64))
         if len(self.node_indices) != self.n_electrodes:
             raise ValueError(
                 f"node_indices length {len(self.node_indices)} does not match "

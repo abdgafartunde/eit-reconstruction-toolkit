@@ -86,12 +86,13 @@ def build_gradient_op(mesh: Mesh) -> sp.csr_array:
         Each row corresponds to one shared edge; the two non-zero entries
         are ``+1`` and ``-1``.
     """
-    elems = mesh.elements   # (E, 3)  int32
+    elems = mesh.elements  # (E, 3)  int32
     E = mesh.n_elements
 
     # Build a map: frozenset{node_i, node_j} → list of element indices
     # for all edges in the mesh.
     from collections import defaultdict
+
     edge_to_elems: dict[tuple[int, int], list[int]] = defaultdict(list)
 
     for e_idx, tri in enumerate(elems):
@@ -104,7 +105,7 @@ def build_gradient_op(mesh: Mesh) -> sp.csr_array:
     # Collect shared (interior) edges — exactly two elements per edge
     rows, cols, data = [], [], []
     row = 0
-    for key, elems_list in edge_to_elems.items():
+    for _key, elems_list in edge_to_elems.items():
         if len(elems_list) == 2:
             e0, e1 = elems_list[0], elems_list[1]
             # Convention: larger index − smaller index → +1, −1
@@ -202,7 +203,7 @@ def tv_solve(
        *Foundations and Trends in Machine Learning*, 3(1), 1–122.
     """
     # ── input validation ──────────────────────────────────────────────────
-    J  = np.asarray(J,  dtype=np.float64)
+    J = np.asarray(J, dtype=np.float64)
     dV = np.asarray(dV, dtype=np.float64)
 
     if J.ndim != 2:
@@ -218,15 +219,15 @@ def tv_solve(
         raise ValueError(f"rho must be a positive finite scalar, got {rho!r}")
 
     # ── build gradient operator ───────────────────────────────────────────
-    D = build_gradient_op(mesh)     # (F, E)  sparse CSR
+    D = build_gradient_op(mesh)  # (F, E)  sparse CSR
     F_rows = D.shape[0]
 
     # ── pre-factor the σ-update system ───────────────────────────────────
     # H = J^T J + ρ D^T D  — symmetric positive definite
-    JtJ = J.T @ J                                    # (E, E)  dense
-    DtD = (D.T @ D)                                  # (E, E)  sparse
-    H   = sp.csr_array(JtJ) + rho * DtD             # (E, E)  sparse
-    Jt_dV = J.T @ dV                                 # (E,)    dense
+    JtJ = J.T @ J  # (E, E)  dense
+    DtD = D.T @ D  # (E, E)  sparse
+    H = sp.csr_array(JtJ) + rho * DtD  # (E, E)  sparse
+    Jt_dV = J.T @ dV  # (E,)    dense
 
     lu = spla.splu(H.tocsc())
 
@@ -236,19 +237,19 @@ def tv_solve(
     else:
         ds = np.zeros(E, dtype=np.float64)
 
-    z = np.zeros(F_rows, dtype=np.float64)   # splitting variable
-    u = np.zeros(F_rows, dtype=np.float64)   # scaled dual variable
+    z = np.zeros(F_rows, dtype=np.float64)  # splitting variable
+    u = np.zeros(F_rows, dtype=np.float64)  # scaled dual variable
 
-    kappa = alpha / rho   # soft-threshold level
+    kappa = alpha / rho  # soft-threshold level
 
     # ── ADMM iterations ───────────────────────────────────────────────────
     for _ in range(max_iter):
         # 1. σ-update: solve H ds = J^T dV + ρ D^T (z - u)
         rhs = Jt_dV + rho * D.T @ (z - u)
-        ds  = lu.solve(np.asarray(rhs).ravel())
+        ds = lu.solve(np.asarray(rhs).ravel())
 
         # 2. z-update: soft-threshold
-        Dds  = D @ ds
+        Dds = D @ ds
         z_new = _soft_threshold(Dds + u, kappa)
 
         # 3. u-update: dual ascent
@@ -256,7 +257,7 @@ def tv_solve(
 
         # 4. convergence check on primal residual ||D ds - z||
         primal_res = np.linalg.norm(Dds - z_new)
-        scale      = max(np.linalg.norm(Dds), np.linalg.norm(z_new), 1.0)
+        scale = max(np.linalg.norm(Dds), np.linalg.norm(z_new), 1.0)
         z = z_new
         if primal_res / scale < tol:
             break

@@ -5,7 +5,6 @@ A small 16-electrode circular mesh is built once per session and reused
 across all test modules to keep the suite fast.
 """
 
-import numpy as np
 import pytest
 
 from eitkit.mesh import make_circle_mesh, place_electrodes

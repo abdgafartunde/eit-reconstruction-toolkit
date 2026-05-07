@@ -59,11 +59,11 @@ def _validate_inputs(
         raise ValueError(f"dV must be 1-D, got shape {dV.shape}")
     P, E = J.shape
     if dV.shape[0] != P:
-        raise ValueError(
-            f"dV length {dV.shape[0]} does not match J rows {P}"
-        )
+        raise ValueError(f"dV length {dV.shape[0]} does not match J rows {P}")
     if not np.isfinite(lambda_) or lambda_ < 0.0:
-        raise ValueError(f"lambda_ must be a non-negative finite scalar, got {lambda_!r}")
+        raise ValueError(
+            f"lambda_ must be a non-negative finite scalar, got {lambda_!r}"
+        )
     return J, dV
 
 
@@ -137,7 +137,7 @@ def tikhonov_solve(
     if solver == "direct":
         # Normal equations: (J^T J + λ I) δσ = J^T δV
         A = J.T @ J
-        A.flat[:: E + 1] += lambda_          # add λ to diagonal (in-place)
+        A.flat[:: E + 1] += lambda_  # add λ to diagonal (in-place)
         rhs = J.T @ dV
         return np.linalg.solve(A, rhs)
 
@@ -216,13 +216,13 @@ def choose_lambda(
         )
     lambdas = np.asarray(lambdas, dtype=np.float64)
 
-    residuals      = np.empty(len(lambdas))
+    residuals = np.empty(len(lambdas))
     solution_norms = np.empty(len(lambdas))
 
     for i, lam in enumerate(lambdas):
         ds = tikhonov_solve(J, dV, float(lam))
-        residuals[i]      = np.log10(np.linalg.norm(J @ ds - dV) + 1e-300)
-        solution_norms[i] = np.log10(np.linalg.norm(ds)          + 1e-300)
+        residuals[i] = np.log10(np.linalg.norm(J @ ds - dV) + 1e-300)
+        solution_norms[i] = np.log10(np.linalg.norm(ds) + 1e-300)
 
     # Maximum-curvature corner via discrete second derivative
     # curvature proxy κ_i ≈ x''y' - x'y'' (unnormalised, sign-consistent)
@@ -236,7 +236,7 @@ def choose_lambda(
     d2y = np.diff(dy)
     # curvature numerator (interior points only: indices 1..-1)
     kappa = np.abs(dx[:-1] * d2y - dy[:-1] * d2x)
-    corner_idx = int(np.argmax(kappa)) + 1   # +1: offset back to full array
+    corner_idx = int(np.argmax(kappa)) + 1  # +1: offset back to full array
     lambda_opt = float(lambdas[corner_idx])
 
     return lambda_opt, residuals, solution_norms

@@ -61,9 +61,7 @@ def adjacent_pattern(n_electrodes: int) -> NDArray[np.int32]:
            [3, 0]], dtype=int32)
     """
     if n_electrodes < 2:
-        raise ValueError(
-            f"n_electrodes must be ≥ 2, got {n_electrodes}."
-        )
+        raise ValueError(f"n_electrodes must be ≥ 2, got {n_electrodes}.")
 
     L = n_electrodes
     sources = np.arange(L, dtype=np.int32)

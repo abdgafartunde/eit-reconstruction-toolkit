@@ -16,11 +16,11 @@ import numpy as np
 import pytest
 import scipy.sparse as sp
 
-from eitkit.inverse import tv_solve, build_gradient_op, tikhonov_solve
+from eitkit.inverse import build_gradient_op, tikhonov_solve, tv_solve
 from eitkit.mesh import make_circle_mesh, place_electrodes
 
-
 # ── fixtures ──────────────────────────────────────────────────────────────────
+
 
 @pytest.fixture(scope="module")
 def coarse_mesh():
@@ -36,12 +36,13 @@ def rng():
 def small_system(coarse_mesh, rng):
     E = coarse_mesh.n_elements
     P = 2 * E
-    J  = rng.standard_normal((P, E))
+    J = rng.standard_normal((P, E))
     dV = rng.standard_normal(P)
     return J, dV
 
 
 # ── TestBuildGradientOp ───────────────────────────────────────────────────────
+
 
 class TestBuildGradientOp:
     def test_returns_sparse_matrix(self, coarse_mesh):
@@ -57,7 +58,7 @@ class TestBuildGradientOp:
         D = build_gradient_op(coarse_mesh)
         F = D.shape[0]
         assert F > 0
-        assert F < 3 * coarse_mesh.n_elements
+        assert 3 * coarse_mesh.n_elements > F
 
     def test_each_row_has_exactly_two_nonzeros(self, coarse_mesh):
         D = build_gradient_op(coarse_mesh)
@@ -84,6 +85,7 @@ class TestBuildGradientOp:
 
 # ── TestTVSolve ───────────────────────────────────────────────────────────────
 
+
 class TestTVSolve:
     def test_output_shape(self, small_system, coarse_mesh):
         J, dV = small_system
@@ -104,7 +106,7 @@ class TestTVSolve:
         """Very large alpha → near-constant (flat) solution."""
         J, dV = small_system
         ds_small = tv_solve(J, dV, alpha=1e-4, mesh=coarse_mesh)
-        ds_large = tv_solve(J, dV, alpha=1e3,  mesh=coarse_mesh)
+        ds_large = tv_solve(J, dV, alpha=1e3, mesh=coarse_mesh)
         D = build_gradient_op(coarse_mesh)
         tv_small = np.linalg.norm(D @ ds_small, 1)
         tv_large = np.linalg.norm(D @ ds_large, 1)
@@ -114,7 +116,7 @@ class TestTVSolve:
         """More regularisation → worse data fit."""
         J, dV = small_system
         ds_small = tv_solve(J, dV, alpha=1e-4, mesh=coarse_mesh)
-        ds_large = tv_solve(J, dV, alpha=1e1,  mesh=coarse_mesh)
+        ds_large = tv_solve(J, dV, alpha=1e1, mesh=coarse_mesh)
         r_small = np.linalg.norm(J @ ds_small - dV)
         r_large = np.linalg.norm(J @ ds_large - dV)
         assert r_large > r_small
@@ -127,14 +129,15 @@ class TestTVSolve:
 
     def test_float32_input_coerced(self, small_system, coarse_mesh):
         J, dV = small_system
-        ds = tv_solve(J.astype(np.float32), dV.astype(np.float32),
-                      alpha=1e-2, mesh=coarse_mesh)
+        ds = tv_solve(
+            J.astype(np.float32), dV.astype(np.float32), alpha=1e-2, mesh=coarse_mesh
+        )
         assert ds.dtype == np.float64
 
     def test_identity_jacobian_low_alpha(self, coarse_mesh):
         """J=I, alpha≈0: solution should be ≈ dV (least-squares)."""
-        E  = coarse_mesh.n_elements
-        J  = np.eye(E)
+        E = coarse_mesh.n_elements
+        J = np.eye(E)
         dV = np.ones(E) * 0.5
         ds = tv_solve(J, dV, alpha=1e-8, mesh=coarse_mesh, max_iter=500, tol=1e-6)
         # With very small alpha TV term is negligible; solution ≈ dV
@@ -143,29 +146,33 @@ class TestTVSolve:
 
 # ── TestTVvsSmoothing ─────────────────────────────────────────────────────────
 
+
 class TestTVvsSmoothing:
     def test_tv_preserves_edges_better_than_tikhonov(self, coarse_mesh, rng):
         """TV should have smaller ||D ds||_1 than Tikhonov at same ||J ds - dV||."""
+        from eitkit.forward import compute_jacobian, simulate
         from eitkit.protocol import adjacent_pattern, measurement_pairs
-        from eitkit.forward import simulate, compute_jacobian
         from eitkit.utils import make_phantom
 
         ec = place_electrodes(coarse_mesh, 16)
         drive_pairs = adjacent_pattern(16)
-        meas_pairs  = measurement_pairs(16)
-        sigma_inc = make_phantom(coarse_mesh, [
-            {"shape": "circle", "cx": 0.3, "cy": 0.0, "r": 0.2, "sigma": 3.0},
-        ])
+        meas_pairs = measurement_pairs(16)
+        sigma_inc = make_phantom(
+            coarse_mesh,
+            [
+                {"shape": "circle", "cx": 0.3, "cy": 0.0, "r": 0.2, "sigma": 3.0},
+            ],
+        )
         sigma_ref = np.ones(coarse_mesh.n_elements)
         dV = simulate(coarse_mesh, ec, sigma_inc, drive_pairs, meas_pairs)
-        J  = compute_jacobian(coarse_mesh, ec, sigma_ref, drive_pairs, meas_pairs)
+        J = compute_jacobian(coarse_mesh, ec, sigma_ref, drive_pairs, meas_pairs)
 
         # Choose lambda so both reconstructions have similar residual
-        ds_tv  = tv_solve(J, dV, alpha=1e-2, mesh=coarse_mesh)
+        ds_tv = tv_solve(J, dV, alpha=1e-2, mesh=coarse_mesh)
         ds_tik = tikhonov_solve(J, dV, lambda_=1e-2)
 
         D = build_gradient_op(coarse_mesh)
-        tv_of_tv  = np.linalg.norm(D @ ds_tv,  1)
+        tv_of_tv = np.linalg.norm(D @ ds_tv, 1)
         tv_of_tik = np.linalg.norm(D @ ds_tik, 1)
 
         # TV solution should have smaller total variation than Tikhonov
@@ -173,6 +180,7 @@ class TestTVvsSmoothing:
 
 
 # ── TestInputValidation ───────────────────────────────────────────────────────
+
 
 class TestInputValidation:
     def test_J_not_2d_raises(self, coarse_mesh):
@@ -197,27 +205,34 @@ class TestInputValidation:
 
     def test_negative_rho_raises(self, coarse_mesh):
         with pytest.raises(ValueError, match="positive"):
-            tv_solve(np.ones((10, 5)), np.ones(10), alpha=1e-2,
-                     mesh=coarse_mesh, rho=-1.0)
+            tv_solve(
+                np.ones((10, 5)), np.ones(10), alpha=1e-2, mesh=coarse_mesh, rho=-1.0
+            )
 
 
 # ── TestIntegration ───────────────────────────────────────────────────────────
 
+
 class TestIntegration:
     @pytest.fixture(scope="class")
     def forward_data(self, circle_mesh, electrodes):
+        from eitkit.forward import compute_jacobian, simulate
         from eitkit.protocol import adjacent_pattern, measurement_pairs
-        from eitkit.forward import simulate, compute_jacobian
         from eitkit.utils import make_phantom
 
         drive_pairs = adjacent_pattern(16)
-        meas_pairs  = measurement_pairs(16)
-        sigma_ref   = np.ones(circle_mesh.n_elements)
-        sigma_inc   = make_phantom(circle_mesh, [
-            {"shape": "circle", "cx": 0.3, "cy": 0.0, "r": 0.2, "sigma": 2.0},
-        ])
+        meas_pairs = measurement_pairs(16)
+        sigma_ref = np.ones(circle_mesh.n_elements)
+        sigma_inc = make_phantom(
+            circle_mesh,
+            [
+                {"shape": "circle", "cx": 0.3, "cy": 0.0, "r": 0.2, "sigma": 2.0},
+            ],
+        )
         dV = simulate(circle_mesh, electrodes, sigma_inc, drive_pairs, meas_pairs)
-        J  = compute_jacobian(circle_mesh, electrodes, sigma_ref, drive_pairs, meas_pairs)
+        J = compute_jacobian(
+            circle_mesh, electrodes, sigma_ref, drive_pairs, meas_pairs
+        )
         return J, dV
 
     def test_reconstruction_shape(self, forward_data, circle_mesh):
@@ -237,6 +252,7 @@ class TestIntegration:
 
     def test_import_from_inverse_top_level(self, forward_data, circle_mesh):
         from eitkit.inverse import tv_solve as tv_top
+
         J, dV = forward_data
         ds = tv_top(J, dV, alpha=1e-2, mesh=circle_mesh)
         assert ds.shape == (circle_mesh.n_elements,)

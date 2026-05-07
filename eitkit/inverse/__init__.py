@@ -9,6 +9,11 @@ physics_informed  PINN, deep image prior (Phase 4).
 hybrid          Algorithm unrolling, learned regulariser (Phase 4).
 """
 
-from eitkit.inverse.classical import tikhonov_solve, choose_lambda, build_gradient_op, tv_solve
+from eitkit.inverse.classical import (
+    build_gradient_op,
+    choose_lambda,
+    tikhonov_solve,
+    tv_solve,
+)
 
 __all__ = ["tikhonov_solve", "choose_lambda", "build_gradient_op", "tv_solve"]

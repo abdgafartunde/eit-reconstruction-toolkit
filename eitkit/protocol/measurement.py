@@ -87,7 +87,7 @@ def measurement_pairs(n_electrodes: int) -> NDArray[np.int32]:
         # skip electrodes k (source) and (k+1)%L (sink) and their
         # immediate neighbours; measure pairs starting at k+2
         for m in range(2, L - 1):
-            plus  = (k + m) % L
+            plus = (k + m) % L
             minus = (k + m + 1) % L
             rows.append((k, plus, minus))
 

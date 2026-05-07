@@ -15,11 +15,11 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
-from eitkit.inverse import tikhonov_solve, choose_lambda
+from eitkit.inverse import choose_lambda, tikhonov_solve
 from eitkit.inverse.classical import tikhonov_solve as tikhonov_solve_classical
 
-
 # ── fixtures ──────────────────────────────────────────────────────────────────
+
 
 @pytest.fixture(scope="module")
 def rng():
@@ -30,9 +30,9 @@ def rng():
 def small_system(rng):
     """Small (P=40, E=20) over-determined system with known ground truth."""
     E, P = 20, 40
-    J  = rng.standard_normal((P, E))
+    J = rng.standard_normal((P, E))
     ds_true = rng.standard_normal(E)
-    dV = J @ ds_true + 1e-4 * rng.standard_normal(P)   # low noise
+    dV = J @ ds_true + 1e-4 * rng.standard_normal(P)  # low noise
     return J, dV, ds_true
 
 
@@ -40,12 +40,13 @@ def small_system(rng):
 def square_system(rng):
     """Square (P=E=30) system."""
     n = 30
-    J  = rng.standard_normal((n, n))
+    J = rng.standard_normal((n, n))
     dV = rng.standard_normal(n)
     return J, dV
 
 
 # ── TestTikhonovSolve ─────────────────────────────────────────────────────────
+
 
 class TestTikhonovSolve:
     def test_output_shape(self, small_system):
@@ -76,12 +77,12 @@ class TestTikhonovSolve:
         J, dV, ds_true = small_system
         ds = tikhonov_solve(J, dV, lambda_=1e-6)
         rel_err = np.linalg.norm(ds - ds_true) / np.linalg.norm(ds_true)
-        assert rel_err < 0.5   # loose but meaningful bound
+        assert rel_err < 0.5  # loose but meaningful bound
 
     def test_identity_jacobian(self):
         """J=I: solution should be dV / (1 + lambda)."""
         E = 10
-        J  = np.eye(E)
+        J = np.eye(E)
         dV = np.ones(E)
         lam = 0.5
         ds = tikhonov_solve(J, dV, lambda_=lam)
@@ -109,7 +110,7 @@ class TestTikhonovSolve:
 
     def test_underdetermined_system(self, rng):
         """Works on underdetermined (P < E) systems."""
-        J  = rng.standard_normal((10, 50))
+        J = rng.standard_normal((10, 50))
         dV = rng.standard_normal(10)
         ds = tikhonov_solve(J, dV, lambda_=1e-2)
         assert ds.shape == (50,)
@@ -118,13 +119,14 @@ class TestTikhonovSolve:
 
 # ── TestTikhonovSolverLSQR ────────────────────────────────────────────────────
 
+
 class TestTikhonovSolverLSQR:
     def test_lsqr_matches_direct(self, small_system):
         """lsqr and direct should agree to ~ 1e-6 relative tolerance."""
         J, dV, _ = small_system
         lam = 1e-3
         ds_direct = tikhonov_solve(J, dV, lambda_=lam, solver="direct")
-        ds_lsqr   = tikhonov_solve(J, dV, lambda_=lam, solver="lsqr")
+        ds_lsqr = tikhonov_solve(J, dV, lambda_=lam, solver="lsqr")
         np.testing.assert_allclose(ds_lsqr, ds_direct, rtol=1e-5, atol=1e-10)
 
     def test_lsqr_output_shape(self, small_system):
@@ -139,6 +141,7 @@ class TestTikhonovSolverLSQR:
 
 
 # ── TestChooseLambda ──────────────────────────────────────────────────────────
+
 
 class TestChooseLambda:
     def test_returns_tuple_of_three(self, small_system):
@@ -192,6 +195,7 @@ class TestChooseLambda:
 
 # ── TestInputValidation ───────────────────────────────────────────────────────
 
+
 class TestInputValidation:
     def test_J_not_2d_raises(self):
         with pytest.raises(ValueError, match="2-D"):
@@ -224,24 +228,30 @@ class TestInputValidation:
 
 # ── TestIntegration ───────────────────────────────────────────────────────────
 
+
 class TestIntegration:
     """End-to-end tests using the full eitkit forward stack."""
 
     @pytest.fixture(scope="class")
     def forward_data(self, circle_mesh, electrodes):
         """Build J and dV from the shared session-scoped mesh/electrodes."""
+        from eitkit.forward import compute_jacobian, simulate
         from eitkit.protocol import adjacent_pattern, measurement_pairs
-        from eitkit.forward import simulate, compute_jacobian
         from eitkit.utils import make_phantom
 
         drive_pairs = adjacent_pattern(16)
-        meas_pairs  = measurement_pairs(16)
-        sigma_ref   = np.ones(circle_mesh.n_elements)
-        sigma_inc   = make_phantom(circle_mesh, [
-            {"shape": "circle", "cx": 0.3, "cy": 0.0, "r": 0.2, "sigma": 2.0},
-        ])
+        meas_pairs = measurement_pairs(16)
+        sigma_ref = np.ones(circle_mesh.n_elements)
+        sigma_inc = make_phantom(
+            circle_mesh,
+            [
+                {"shape": "circle", "cx": 0.3, "cy": 0.0, "r": 0.2, "sigma": 2.0},
+            ],
+        )
         dV = simulate(circle_mesh, electrodes, sigma_inc, drive_pairs, meas_pairs)
-        J  = compute_jacobian(circle_mesh, electrodes, sigma_ref, drive_pairs, meas_pairs)
+        J = compute_jacobian(
+            circle_mesh, electrodes, sigma_ref, drive_pairs, meas_pairs
+        )
         return J, dV, sigma_inc, sigma_ref
 
     def test_reconstruction_shape(self, forward_data, circle_mesh):

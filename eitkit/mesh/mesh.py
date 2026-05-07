@@ -94,9 +94,7 @@ class Mesh:
     # ------------------------------------------------------------------
     def _validate(self) -> None:
         if self.nodes.ndim != 2 or self.nodes.shape[1] != 2:
-            raise ValueError(
-                f"nodes must have shape (N, 2), got {self.nodes.shape}."
-            )
+            raise ValueError(f"nodes must have shape (N, 2), got {self.nodes.shape}.")
         if self.elements.ndim != 2 or self.elements.shape[1] != 3:
             raise ValueError(
                 f"elements must have shape (M, 3), got {self.elements.shape}."
@@ -156,6 +154,7 @@ class Mesh:
 # Internal helper
 # ---------------------------------------------------------------------------
 
+
 def _compute_areas(
     nodes: NDArray[np.float64],
     elements: NDArray[np.int32],
@@ -173,5 +172,7 @@ def _compute_areas(
     p0 = nodes[elements[:, 0]]
     p1 = nodes[elements[:, 1]]
     p2 = nodes[elements[:, 2]]
-    return 0.5 * ((p1[:, 0] - p0[:, 0]) * (p2[:, 1] - p0[:, 1])
-                  - (p2[:, 0] - p0[:, 0]) * (p1[:, 1] - p0[:, 1]))
+    return 0.5 * (
+        (p1[:, 0] - p0[:, 0]) * (p2[:, 1] - p0[:, 1])
+        - (p2[:, 0] - p0[:, 0]) * (p1[:, 1] - p0[:, 1])
+    )

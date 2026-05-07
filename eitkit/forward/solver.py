@@ -133,9 +133,7 @@ def solve_forward(
     """
     N = K.shape[0]
     if not (0 <= ground_node < N):
-        raise ValueError(
-            f"ground_node {ground_node} out of range [0, {N})."
-        )
+        raise ValueError(f"ground_node {ground_node} out of range [0, {N}).")
 
     # Apply Dirichlet BC and solve.
     # Callers that perform many solves with the same K should call

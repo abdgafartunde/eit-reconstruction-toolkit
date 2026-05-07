@@ -77,8 +77,7 @@ def build_load_vector(
 
     if not (0 <= src_el < n_el) or not (0 <= snk_el < n_el):
         raise ValueError(
-            f"drive_pair electrodes {(src_el, snk_el)} out of range "
-            f"[0, {n_el})."
+            f"drive_pair electrodes {(src_el, snk_el)} out of range [0, {n_el})."
         )
     if src_el == snk_el:
         raise ValueError("Source and sink electrodes must differ.")

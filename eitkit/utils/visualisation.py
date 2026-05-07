@@ -30,8 +30,8 @@ from matplotlib.axes import Axes
 from matplotlib.figure import Figure
 from numpy.typing import NDArray
 
-from eitkit.mesh.mesh import Mesh
 from eitkit.mesh.electrode_placement import ElectrodeConfig
+from eitkit.mesh.mesh import Mesh
 
 __all__ = ["plot_mesh", "plot_conductivity", "plot_voltages"]
 
@@ -78,26 +78,40 @@ def plot_mesh(
     else:
         fig = ax.get_figure()
 
-    triang = tri.Triangulation(
-        mesh.nodes[:, 0], mesh.nodes[:, 1], mesh.elements
-    )
-    ax.triplot(triang, color=mesh_color, linewidth=linewidth, alpha=0.7,
-               **kwargs)
+    triang = tri.Triangulation(mesh.nodes[:, 0], mesh.nodes[:, 1], mesh.elements)
+    ax.triplot(triang, color=mesh_color, linewidth=linewidth, alpha=0.7, **kwargs)
 
     # Boundary nodes
     bnd_xy = mesh.nodes[mesh.boundary_nodes]
-    ax.scatter(bnd_xy[:, 0], bnd_xy[:, 1], s=8, color=boundary_color,
-               zorder=3, label="boundary nodes")
+    ax.scatter(
+        bnd_xy[:, 0],
+        bnd_xy[:, 1],
+        s=8,
+        color=boundary_color,
+        zorder=3,
+        label="boundary nodes",
+    )
 
     # Electrode nodes
     if elec_config is not None:
         el_xy = mesh.nodes[elec_config.node_indices]
-        ax.scatter(el_xy[:, 0], el_xy[:, 1], s=60, color=electrode_color,
-                   zorder=5, label="electrodes")
+        ax.scatter(
+            el_xy[:, 0],
+            el_xy[:, 1],
+            s=60,
+            color=electrode_color,
+            zorder=5,
+            label="electrodes",
+        )
         for i, (x, y) in enumerate(el_xy):
             ax.text(
-                x * 1.10, y * 1.10, str(i + 1),
-                fontsize=6, ha="center", va="center", color=electrode_color,
+                x * 1.10,
+                y * 1.10,
+                str(i + 1),
+                fontsize=6,
+                ha="center",
+                va="center",
+                color=electrode_color,
             )
 
     ax.set_aspect("equal")
@@ -157,14 +171,13 @@ def plot_conductivity(
     else:
         fig = ax.get_figure()
 
-    triang = tri.Triangulation(
-        mesh.nodes[:, 0], mesh.nodes[:, 1], mesh.elements
-    )
+    triang = tri.Triangulation(mesh.nodes[:, 0], mesh.nodes[:, 1], mesh.elements)
     _vmin = float(sigma.min()) if vmin is None else vmin
     _vmax = float(sigma.max()) if vmax is None else vmax
 
-    tpc = ax.tripcolor(triang, sigma, cmap=cmap, shading="flat",
-                       vmin=_vmin, vmax=_vmax, **kwargs)
+    tpc = ax.tripcolor(
+        triang, sigma, cmap=cmap, shading="flat", vmin=_vmin, vmax=_vmax, **kwargs
+    )
     fig.colorbar(tpc, ax=ax, label="σ (S/m)")
 
     if show_mesh:
@@ -172,8 +185,9 @@ def plot_conductivity(
 
     if elec_config is not None:
         el_xy = mesh.nodes[elec_config.node_indices]
-        ax.scatter(el_xy[:, 0], el_xy[:, 1], s=40, color="cyan",
-                   zorder=5, label="electrodes")
+        ax.scatter(
+            el_xy[:, 0], el_xy[:, 1], s=40, color="cyan", zorder=5, label="electrodes"
+        )
         ax.legend(fontsize=7, loc="lower right")
 
     ax.set_aspect("equal")
@@ -231,7 +245,7 @@ def plot_voltages(
     """
     dV = np.asarray(dV, dtype=np.float64)
     n_per_step = n_electrodes - 3
-    expected   = n_electrodes * n_per_step
+    expected = n_electrodes * n_per_step
     if len(dV) != expected:
         raise ValueError(
             f"len(dV)={len(dV)} does not match "
@@ -262,10 +276,14 @@ def plot_voltages(
     fig.colorbar(im, ax=ax, label="δV (V)", shrink=0.85)
 
     if highlight_drive is not None:
-        ax.axhline(highlight_drive - 0.5, color="gold", linewidth=1.8,
-                   linestyle="--")
-        ax.axhline(highlight_drive + 0.5, color="gold", linewidth=1.8,
-                   linestyle="--", label=f"drive step {highlight_drive}")
+        ax.axhline(highlight_drive - 0.5, color="gold", linewidth=1.8, linestyle="--")
+        ax.axhline(
+            highlight_drive + 0.5,
+            color="gold",
+            linewidth=1.8,
+            linestyle="--",
+            label=f"drive step {highlight_drive}",
+        )
         ax.legend(fontsize=8, loc="upper right")
 
     ax.set_title(title)

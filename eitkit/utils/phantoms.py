@@ -115,9 +115,7 @@ def make_phantom(
     (488,)
     """
     if sigma_background <= 0:
-        raise ValueError(
-            f"sigma_background must be positive, got {sigma_background}."
-        )
+        raise ValueError(f"sigma_background must be positive, got {sigma_background}.")
 
     # Element centroids, shape (M, 2)
     centroids = mesh.nodes[mesh.elements].mean(axis=1)
@@ -130,53 +128,59 @@ def make_phantom(
         shape = inc.get("shape", "").lower()
         inc_sigma = float(inc["sigma"])
         if inc_sigma <= 0:
-            raise ValueError(
-                f"Inclusion sigma must be positive, got {inc_sigma}."
-            )
+            raise ValueError(f"Inclusion sigma must be positive, got {inc_sigma}.")
 
         if shape == "circle":
             _cx = float(inc["cx"])
             _cy = float(inc["cy"])
-            _r  = float(inc["r"])
-            inside = (cx_e - _cx) ** 2 + (cy_e - _cy) ** 2 <= _r ** 2
+            _r = float(inc["r"])
+            inside = (cx_e - _cx) ** 2 + (cy_e - _cy) ** 2 <= _r**2
             sigma[inside] = inc_sigma
 
         elif shape == "ellipse":
-            _cx    = float(inc["cx"])
-            _cy    = float(inc["cy"])
-            _a     = float(inc["a"])
-            _b     = float(inc["b"])
+            _cx = float(inc["cx"])
+            _cy = float(inc["cy"])
+            _a = float(inc["a"])
+            _b = float(inc["b"])
             _theta = float(inc.get("theta", 0.0))
-            cos_t  = np.cos(_theta)
-            sin_t  = np.sin(_theta)
+            cos_t = np.cos(_theta)
+            sin_t = np.sin(_theta)
             dx = cx_e - _cx
             dy = cy_e - _cy
-            x_rot =  cos_t * dx + sin_t * dy
+            x_rot = cos_t * dx + sin_t * dy
             y_rot = -sin_t * dx + cos_t * dy
             inside = (x_rot / _a) ** 2 + (y_rot / _b) ** 2 <= 1.0
             sigma[inside] = inc_sigma
 
         elif shape == "rectangle":
             inside = _in_rectangle(
-                cx_e, cy_e,
-                float(inc["cx"]), float(inc["cy"]),
-                float(inc["w"]),  float(inc["h"]),
+                cx_e,
+                cy_e,
+                float(inc["cx"]),
+                float(inc["cy"]),
+                float(inc["w"]),
+                float(inc["h"]),
                 float(inc.get("theta", 0.0)),
             )
             sigma[inside] = inc_sigma
 
         elif shape == "ring":
             inside = _in_ring(
-                cx_e, cy_e,
-                float(inc["cx"]),      float(inc["cy"]),
-                float(inc["r_inner"]), float(inc["r_outer"]),
+                cx_e,
+                cy_e,
+                float(inc["cx"]),
+                float(inc["cy"]),
+                float(inc["r_inner"]),
+                float(inc["r_outer"]),
             )
             sigma[inside] = inc_sigma
 
         elif shape == "triangle":
             inside = _in_triangle(
-                cx_e, cy_e,
-                float(inc["cx"]),           float(inc["cy"]),
+                cx_e,
+                cy_e,
+                float(inc["cx"]),
+                float(inc["cy"]),
                 float(inc["side"]),
                 float(inc.get("theta", 0.0)),
             )
@@ -196,11 +200,14 @@ def make_phantom(
 # Internal shape helpers
 # ---------------------------------------------------------------------------
 
+
 def _in_rectangle(
     cx_e: np.ndarray,
     cy_e: np.ndarray,
-    cx: float, cy: float,
-    w: float, h: float,
+    cx: float,
+    cy: float,
+    w: float,
+    h: float,
     theta: float,
 ) -> np.ndarray:
     """Return boolean mask: centroid inside axis-aligned/rotated rectangle."""
@@ -208,7 +215,7 @@ def _in_rectangle(
     sin_t = np.sin(theta)
     dx = cx_e - cx
     dy = cy_e - cy
-    x_rot =  cos_t * dx + sin_t * dy
+    x_rot = cos_t * dx + sin_t * dy
     y_rot = -sin_t * dx + cos_t * dy
     return (np.abs(x_rot) <= w) & (np.abs(y_rot) <= h)
 
@@ -216,26 +223,31 @@ def _in_rectangle(
 def _in_ring(
     cx_e: np.ndarray,
     cy_e: np.ndarray,
-    cx: float, cy: float,
-    r_inner: float, r_outer: float,
+    cx: float,
+    cy: float,
+    r_inner: float,
+    r_outer: float,
 ) -> np.ndarray:
     """Return boolean mask: centroid inside annular ring."""
     dist2 = (cx_e - cx) ** 2 + (cy_e - cy) ** 2
-    return (dist2 >= r_inner ** 2) & (dist2 <= r_outer ** 2)
+    return (dist2 >= r_inner**2) & (dist2 <= r_outer**2)
 
 
 def _in_triangle(
     cx_e: np.ndarray,
     cy_e: np.ndarray,
-    cx: float, cy: float,
+    cx: float,
+    cy: float,
     side: float,
     theta: float,
 ) -> np.ndarray:
     """Return boolean mask: centroid inside equilateral triangle (barycentric)."""
     # Equilateral triangle vertices centred at origin, before rotation
-    R = side / np.sqrt(3.0)          # circumradius
-    angles = np.array([np.pi / 2, np.pi / 2 + 2 * np.pi / 3,
-                       np.pi / 2 + 4 * np.pi / 3]) + theta
+    R = side / np.sqrt(3.0)  # circumradius
+    angles = (
+        np.array([np.pi / 2, np.pi / 2 + 2 * np.pi / 3, np.pi / 2 + 4 * np.pi / 3])
+        + theta
+    )
     vx = cx + R * np.cos(angles)
     vy = cy + R * np.sin(angles)
 

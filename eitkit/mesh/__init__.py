@@ -8,8 +8,8 @@ make_circle_mesh       Generate a quality 2D triangular mesh on a unit disc.
 place_electrodes       Distribute L electrodes uniformly on the boundary.
 """
 
-from eitkit.mesh.mesh import Mesh
 from eitkit.mesh.distmesh2d import make_circle_mesh
 from eitkit.mesh.electrode_placement import ElectrodeConfig, place_electrodes
+from eitkit.mesh.mesh import Mesh
 
 __all__ = ["Mesh", "make_circle_mesh", "ElectrodeConfig", "place_electrodes"]

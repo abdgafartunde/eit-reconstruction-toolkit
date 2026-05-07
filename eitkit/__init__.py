@@ -10,7 +10,7 @@ inverse     Reconstruction algorithms (classical, data-driven, hybrid).
 utils       Phantoms, visualisation, and metrics.
 """
 
-from importlib.metadata import version, PackageNotFoundError
+from importlib.metadata import PackageNotFoundError, version
 
 try:
     __version__: str = version("eitkit")

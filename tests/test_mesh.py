@@ -16,9 +16,7 @@ regardless of mesh density:
 import numpy as np
 import pytest
 
-from eitkit.mesh import ElectrodeConfig, Mesh, make_circle_mesh, place_electrodes
-from eitkit.mesh.mesh import _compute_areas
-
+from eitkit.mesh import Mesh, make_circle_mesh, place_electrodes
 
 # ---------------------------------------------------------------------------
 # Mesh dataclass

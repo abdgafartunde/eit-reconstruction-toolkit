@@ -59,11 +59,11 @@ import numpy as np
 import scipy.sparse as sp
 from numpy.typing import NDArray
 
-from eitkit.mesh.mesh import Mesh
-from eitkit.mesh.electrode_placement import ElectrodeConfig
 from eitkit.forward.fem_assembler import assemble_K
 from eitkit.forward.gap_model import build_load_vector
 from eitkit.forward.solver import apply_dirichlet_bc, pick_ground_node
+from eitkit.mesh.electrode_placement import ElectrodeConfig
+from eitkit.mesh.mesh import Mesh
 
 __all__ = ["compute_jacobian"]
 
@@ -91,8 +91,8 @@ def _gradient_coefficients(
     -------
     b, c : ndarray, each shape ``(M, 3)``
     """
-    x = mesh.nodes[mesh.elements, 0]   # (M, 3)
-    y = mesh.nodes[mesh.elements, 1]   # (M, 3)
+    x = mesh.nodes[mesh.elements, 0]  # (M, 3)
+    y = mesh.nodes[mesh.elements, 1]  # (M, 3)
 
     b = np.empty_like(x)
     c = np.empty_like(x)
@@ -119,9 +119,9 @@ def _element_grad_projections(
     gu_c : ndarray, shape ``(M,)``
         ``sum_j c[e,j] * u[node_j]`` for each element.
     """
-    u_e = u[mesh.elements]              # (M, 3)  — nodal values per element
-    gu_b = (b * u_e).sum(axis=1)        # (M,)
-    gu_c = (c * u_e).sum(axis=1)        # (M,)
+    u_e = u[mesh.elements]  # (M, 3)  — nodal values per element
+    gu_b = (b * u_e).sum(axis=1)  # (M,)
+    gu_c = (c * u_e).sum(axis=1)  # (M,)
     return gu_b, gu_c
 
 
@@ -173,13 +173,13 @@ def compute_jacobian(
 
     # ── Step 5a: element gradient coefficients ────────────────────────────
     b, c = _gradient_coefficients(mesh)
-    prefactor = -1.0 / (4.0 * mesh.areas)   # (M,)  scalar per element
+    prefactor = -1.0 / (4.0 * mesh.areas)  # (M,)  scalar per element
 
     # ── Step 5b: assemble K, apply BC once, factorize once ────────────────
-    K_bc   = apply_dirichlet_bc(assemble_K(mesh, sigma), pick_ground_node(mesh)).tocsc()
+    K_bc = apply_dirichlet_bc(assemble_K(mesh, sigma), pick_ground_node(mesh)).tocsc()
     g_node = pick_ground_node(mesh)
-    lu     = sp.linalg.splu(K_bc)
-    L      = len(drive_pairs)
+    lu = sp.linalg.splu(K_bc)
+    L = len(drive_pairs)
 
     # Cache forward gradient projections: shape (L, M) each
     GUb = np.empty((L, mesh.n_elements), dtype=np.float64)
@@ -192,20 +192,21 @@ def compute_jacobian(
         GUb[k], GUc[k] = _element_grad_projections(mesh, u_k, b, c)
 
     # ── Step 5c: solve unique adjoint problems (one factorization reused) ─
-    unique_pairs = np.unique(meas_pairs[:, 1:], axis=0)   # (Q, 2)
+    unique_pairs = np.unique(meas_pairs[:, 1:], axis=0)  # (Q, 2)
 
     adj_gb: dict[tuple[int, int], NDArray[np.float64]] = {}
     adj_gc: dict[tuple[int, int], NDArray[np.float64]] = {}
 
     for plus_el, minus_el in unique_pairs:
         f_adj = build_load_vector(
-            mesh.n_nodes, elec_config,
+            mesh.n_nodes,
+            elec_config,
             drive_pair=(int(plus_el), int(minus_el)),
             current=1.0,
         )
         f_adj[g_node] = 0.0
-        phi  = lu.solve(f_adj)
-        key  = (int(plus_el), int(minus_el))
+        phi = lu.solve(f_adj)
+        key = (int(plus_el), int(minus_el))
         adj_gb[key], adj_gc[key] = _element_grad_projections(mesh, phi, b, c)
 
     # ── Step 5d: assemble J ───────────────────────────────────────────────
@@ -213,8 +214,7 @@ def compute_jacobian(
     J = np.empty((P, mesh.n_elements), dtype=np.float64)
 
     for i, (k, plus_el, minus_el) in enumerate(meas_pairs):
-        key     = (int(plus_el), int(minus_el))
-        J[i, :] = prefactor * (GUb[int(k)] * adj_gb[key] +
-                                GUc[int(k)] * adj_gc[key])
+        key = (int(plus_el), int(minus_el))
+        J[i, :] = prefactor * (GUb[int(k)] * adj_gb[key] + GUc[int(k)] * adj_gc[key])
 
     return J

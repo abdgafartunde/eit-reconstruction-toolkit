@@ -13,9 +13,8 @@ import numpy as np
 import pytest
 import scipy.sparse as sp
 
-from eitkit.forward import assemble_K, simulate, compute_jacobian
+from eitkit.forward import assemble_K, compute_jacobian, simulate
 from eitkit.protocol import adjacent_pattern, measurement_pairs
-
 
 # ---------------------------------------------------------------------------
 # assemble_K
@@ -104,7 +103,7 @@ class TestSimulate:
         drive, meas = protocol
         sigma = np.ones(circle_mesh.n_elements)
         centroids = circle_mesh.nodes[circle_mesh.elements].mean(axis=1)
-        inside = (centroids[:, 0] ** 2 + (centroids[:, 1] - 0.5) ** 2) < 0.1 ** 2
+        inside = (centroids[:, 0] ** 2 + (centroids[:, 1] - 0.5) ** 2) < 0.1**2
         sigma[inside] = 3.0
         dV = simulate(circle_mesh, electrodes, sigma, drive, meas, sigma0=1.0)
         assert np.any(np.abs(dV) > 1e-8)
@@ -118,40 +117,38 @@ class TestSimulate:
         angle = 2 * np.pi * 3 / 16
         cx, cy = 0.6 * np.cos(angle), 0.6 * np.sin(angle)
         centroids = circle_mesh.nodes[circle_mesh.elements].mean(axis=1)
-        inside = (centroids[:, 0] - cx) ** 2 + (centroids[:, 1] - cy) ** 2 < 0.15 ** 2
+        inside = (centroids[:, 0] - cx) ** 2 + (centroids[:, 1] - cy) ** 2 < 0.15**2
         sigma[inside] = 4.0
         dV = simulate(circle_mesh, electrodes, sigma, drive, meas, sigma0=1.0)
         # Nearby drive steps (2, 3, 4) have larger |dV| than opposite (10, 11)
-        near_steps  = [2, 3, 4]
-        far_steps   = [10, 11]
+        near_steps = [2, 3, 4]
+        far_steps = [10, 11]
         n_per = 16 - 3
-        near_rms = np.sqrt(np.mean([
-            dV[k * n_per:(k + 1) * n_per] ** 2 for k in near_steps
-        ]))
-        far_rms = np.sqrt(np.mean([
-            dV[k * n_per:(k + 1) * n_per] ** 2 for k in far_steps
-        ]))
+        near_rms = np.sqrt(
+            np.mean([dV[k * n_per : (k + 1) * n_per] ** 2 for k in near_steps])
+        )
+        far_rms = np.sqrt(
+            np.mean([dV[k * n_per : (k + 1) * n_per] ** 2 for k in far_steps])
+        )
         assert near_rms > far_rms
 
     def test_linearity_in_sigma_perturbation(self, circle_mesh, electrodes, protocol):
         # δV should scale (approximately) linearly with anomaly amplitude
         # for small perturbations (Born approximation regime)
         drive, meas = protocol
-        rng = np.random.default_rng(42)
         centroids = circle_mesh.nodes[circle_mesh.elements].mean(axis=1)
-        inside = centroids[:, 0] ** 2 + centroids[:, 1] ** 2 < 0.2 ** 2
+        inside = centroids[:, 0] ** 2 + centroids[:, 1] ** 2 < 0.2**2
 
         dVs = []
         for amp in [0.01, 0.02]:
             sigma = np.ones(circle_mesh.n_elements)
             sigma[inside] += amp
-            dVs.append(simulate(circle_mesh, electrodes, sigma,
-                                drive, meas, sigma0=1.0))
+            dVs.append(
+                simulate(circle_mesh, electrodes, sigma, drive, meas, sigma0=1.0)
+            )
         # dV(2×amp) ≈ 2 × dV(amp) with tolerance for nonlinearity
         ratio = dVs[1] / (dVs[0] + 1e-20)
-        np.testing.assert_allclose(
-            ratio[np.abs(dVs[0]) > 1e-10], 2.0, rtol=0.05
-        )
+        np.testing.assert_allclose(ratio[np.abs(dVs[0]) > 1e-10], 2.0, rtol=0.05)
 
 
 # ---------------------------------------------------------------------------
@@ -163,7 +160,7 @@ class TestComputeJacobian:
     @pytest.fixture(scope="class")
     def jacobian_data(self, circle_mesh, electrodes):
         drive = adjacent_pattern(16)
-        meas  = measurement_pairs(16)
+        meas = measurement_pairs(16)
         sigma = np.ones(circle_mesh.n_elements)
         J = compute_jacobian(circle_mesh, electrodes, sigma, drive, meas)
         return J, circle_mesh, electrodes, sigma, drive, meas
@@ -189,7 +186,7 @@ class TestComputeJacobian:
     def test_fd_accuracy(self, circle_mesh, electrodes):
         """Finite-difference check: J·δσ ≈ δV for a small perturbation."""
         drive = adjacent_pattern(16)
-        meas  = measurement_pairs(16)
+        meas = measurement_pairs(16)
         sigma = np.ones(circle_mesh.n_elements)
         J = compute_jacobian(circle_mesh, electrodes, sigma, drive, meas)
 

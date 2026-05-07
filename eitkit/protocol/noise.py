@@ -78,9 +78,7 @@ def add_noise(
     True
     """
     if not np.isfinite(snr_db) or snr_db <= 0:
-        raise ValueError(
-            f"snr_db must be a finite positive number, got {snr_db!r}."
-        )
+        raise ValueError(f"snr_db must be a finite positive number, got {snr_db!r}.")
 
     v = np.asarray(voltages, dtype=np.float64)
 
@@ -91,7 +89,7 @@ def add_noise(
     else:
         generator = rng
 
-    signal_power = np.sqrt(np.sum(v ** 2))  # ‖v‖
+    signal_power = np.sqrt(np.sum(v**2))  # ‖v‖
     n_samples = v.size
 
     # σ such that ‖η‖ / ‖v‖ = 10^(−SNR/20)  in expectation

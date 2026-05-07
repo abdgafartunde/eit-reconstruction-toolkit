@@ -93,16 +93,16 @@ def assemble_K(
     if np.any(sigma <= 0):
         raise ValueError("All conductivity values must be strictly positive.")
 
-    nodes = mesh.nodes          # (N, 2)
-    elems = mesh.elements       # (M, 3)  int32
-    areas = mesh.areas          # (M,)    float64
+    nodes = mesh.nodes  # (N, 2)
+    elems = mesh.elements  # (M, 3)  int32
+    areas = mesh.areas  # (M,)    float64
 
     M = mesh.n_elements
     N = mesh.n_nodes
 
     # Node coordinates for each element corner, shape (M, 3)
-    x = nodes[elems, 0]         # (M, 3)
-    y = nodes[elems, 1]         # (M, 3)
+    x = nodes[elems, 0]  # (M, 3)
+    y = nodes[elems, 1]  # (M, 3)
 
     # Gradient coefficients (vectorised, indices mod 3)
     # b_i = y_{i+1 mod 3} - y_{i+2 mod 3}
@@ -117,7 +117,7 @@ def assemble_K(
 
     # Element stiffness: K^e_ij = σ_e / (4 A_e) * (b_i b_j + c_i c_j)
     # Vectorise over all 9 (local_i, local_j) combinations
-    prefactor = sigma / (4.0 * areas)   # (M,)
+    prefactor = sigma / (4.0 * areas)  # (M,)
 
     # Build COO data arrays: 9 entries per element = 9*M total
     rows_list = []

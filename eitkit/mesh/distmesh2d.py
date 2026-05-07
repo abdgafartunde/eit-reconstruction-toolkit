@@ -83,9 +83,7 @@ def make_circle_mesh(
     # 2. Add electrode nodes exactly on the boundary (fixed during relax)
     # ------------------------------------------------------------------
     elec_angles = np.linspace(0.0, 2.0 * np.pi, n_electrodes, endpoint=False)
-    elec_nodes = radius * np.column_stack(
-        (np.cos(elec_angles), np.sin(elec_angles))
-    )
+    elec_nodes = radius * np.column_stack((np.cos(elec_angles), np.sin(elec_angles)))
     nodes = np.vstack([nodes, elec_nodes])
 
     # Remove interior points that are too close to electrode nodes
@@ -286,9 +284,9 @@ def _enforce_ccw(
     p0 = nodes[elements[:, 0]]
     p1 = nodes[elements[:, 1]]
     p2 = nodes[elements[:, 2]]
-    cross = (p1[:, 0] - p0[:, 0]) * (p2[:, 1] - p0[:, 1]) - (
-        p2[:, 0] - p0[:, 0]
-    ) * (p1[:, 1] - p0[:, 1])
+    cross = (p1[:, 0] - p0[:, 0]) * (p2[:, 1] - p0[:, 1]) - (p2[:, 0] - p0[:, 0]) * (
+        p1[:, 1] - p0[:, 1]
+    )
     cw = cross < 0
     elements[cw] = elements[cw][:, [0, 2, 1]]
     return elements

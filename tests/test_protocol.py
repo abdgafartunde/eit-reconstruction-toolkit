@@ -10,10 +10,8 @@ Unit tests for ``eitkit.protocol``:
 from __future__ import annotations
 
 import numpy as np
-import pytest
 
-from eitkit.protocol import adjacent_pattern, measurement_pairs, add_noise
-
+from eitkit.protocol import add_noise, adjacent_pattern, measurement_pairs
 
 # ---------------------------------------------------------------------------
 # adjacent_pattern
@@ -170,9 +168,9 @@ class TestAddNoise:
     def test_lower_snr_adds_more_noise(self):
         v = self._clean_signal(np.random.default_rng(42))
         vn_high = add_noise(v, snr_db=60.0, rng=np.random.default_rng(0))
-        vn_low  = add_noise(v, snr_db=20.0, rng=np.random.default_rng(0))
+        vn_low = add_noise(v, snr_db=20.0, rng=np.random.default_rng(0))
         noise_high = np.std(vn_high - v)
-        noise_low  = np.std(vn_low  - v)
+        noise_low = np.std(vn_low - v)
         assert noise_low > noise_high
 
     def test_zero_vector_no_noise(self):
