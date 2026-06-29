@@ -1,0 +1,43 @@
+{
+  "title": "eitkit — Electrical Impedance Tomography Reconstruction Toolkit",
+  "description": "A modular, research-grade Python package for 2-D Electrical Impedance Tomography (EIT): forward simulation using P1 finite elements with a gap electrode model, adjoint-method Jacobian computation, and classical regularisation-based inverse reconstruction (Tikhonov with L-curve heuristic and Total Variation via ADMM). Mesh generation uses the DistMesh2D algorithm of Persson & Strang (2004).",
+  "creators": [
+    {
+      "name": "Tiamiyu, Abd'gafar Tunde",
+      "affiliation": "Independent Researcher",
+      "orcid": ""
+    }
+  ],
+  "keywords": [
+    "electrical impedance tomography",
+    "EIT",
+    "inverse problems",
+    "finite element method",
+    "FEM",
+    "Tikhonov regularisation",
+    "total variation",
+    "ADMM",
+    "adjoint method",
+    "scientific computing",
+    "medical imaging",
+    "computational mathematics"
+  ],
+  "license": "MIT",
+  "upload_type": "software",
+  "access_right": "open",
+  "language": "eng",
+  "version": "0.1.0",
+  "related_identifiers": [
+    {
+      "relation": "isSupplementTo",
+      "identifier": "https://github.com/abdgafartunde/eit-reconstruction-toolkit"
+    }
+  ],
+  "references": [
+    "Calderón, A.P. (1980). On an inverse boundary value problem. Seminar on Numerical Analysis and its Applications to Continuum Physics, Rio de Janeiro.",
+    "Persson, P.-O. & Strang, G. (2004). A simple mesh generator in MATLAB. SIAM Review, 46(2), 329–345.",
+    "Hansen, P.C. (1992). Analysis of discrete ill-posed problems by means of the L-curve. SIAM Review, 34(4), 561–580.",
+    "Boyd, S. et al. (2011). Distributed optimization and statistical learning via the alternating direction method of multipliers. Foundations and Trends in Machine Learning, 3(1), 1–122.",
+    "Adler, A. & Lionheart, W.R.B. (2006). Uses and abuses of EIDORS: an extensible software base for EIT. Physiological Measurement, 27(5), S25–S42."
+  ]
+}
