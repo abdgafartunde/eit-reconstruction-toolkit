@@ -2,6 +2,8 @@
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
+[![DOI](https://zenodo.org/badge/1231635377.svg)](https://doi.org/10.5281/zenodo.21037312)
+
 A modular, research-grade Python package for **2-D Electrical Impedance Tomography (EIT)**:
 forward simulation, Jacobian computation, and classical inverse reconstruction.
 
