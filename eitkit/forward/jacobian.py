@@ -176,8 +176,8 @@ def compute_jacobian(
     prefactor = -1.0 / (4.0 * mesh.areas)  # (M,)  scalar per element
 
     # ── Step 5b: assemble K, apply BC once, factorize once ────────────────
-    K_bc = apply_dirichlet_bc(assemble_K(mesh, sigma), pick_ground_node(mesh)).tocsc()
     g_node = pick_ground_node(mesh)
+    K_bc = apply_dirichlet_bc(assemble_K(mesh, sigma), g_node).tocsc()
     lu = sp.linalg.splu(K_bc)
     L = len(drive_pairs)
 

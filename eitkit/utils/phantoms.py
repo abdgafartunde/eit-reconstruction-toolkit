@@ -73,8 +73,8 @@ def make_phantom(
         Triangular mesh.
     inclusions:
         List of inclusion dicts.  Each dict **must** contain the key
-        ``"shape"`` (``"circle"`` or ``"ellipse"``) and ``"sigma"``
-        (conductivity of the inclusion), plus shape-specific parameters:
+        ``"shape"`` and ``"sigma"`` (conductivity of the inclusion),
+        plus shape-specific parameters:
 
         Circle::
 
@@ -85,6 +85,21 @@ def make_phantom(
 
             {"shape": "ellipse", "cx": 0.0, "cy": 0.5,
              "a": 0.3, "b": 0.15, "theta": 0.0, "sigma": 0.5}
+
+        Rectangle::
+
+            {"shape": "rectangle", "cx": 0.0, "cy": 0.0,
+             "w": 0.3, "h": 0.2, "theta": 0.0, "sigma": 2.0}
+
+        Ring::
+
+            {"shape": "ring", "cx": 0.0, "cy": 0.0,
+             "r_inner": 0.2, "r_outer": 0.4, "sigma": 2.0}
+
+        Triangle::
+
+            {"shape": "triangle", "cx": 0.0, "cy": 0.0,
+             "side": 0.4, "theta": 0.0, "sigma": 3.0}
 
         Inclusions are applied in list order; later ones overwrite
         earlier ones where they overlap.

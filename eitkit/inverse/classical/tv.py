@@ -139,7 +139,7 @@ def tv_solve(
     alpha: float,
     mesh: Mesh,
     *,
-    rho: float = 1.0,
+    rho: float | str = "auto",
     max_iter: int = 200,
     tol: float = 1e-4,
     warm_start: NDArray[np.float64] | None = None,
@@ -168,8 +168,10 @@ def tv_solve(
     mesh:
         Triangular mesh — needed to build the gradient operator ``D``.
     rho:
-        ADMM penalty parameter.  Typical range ``[0.1, 10]``.
-        Does not affect the optimal solution, only convergence speed.
+        ADMM penalty parameter.  If ``"auto"`` (default), set to
+        :math:`\operatorname{tr}(J^T J) / \operatorname{tr}(D^T D)`
+        so that the two quadratic terms in the augmented Lagrangian
+        have commensurate scale.  Otherwise a positive float.
     max_iter:
         Maximum number of ADMM iterations.
     tol:
@@ -188,7 +190,7 @@ def tv_solve(
     ------
     ValueError
         If ``J`` is not 2-D, ``dV`` length mismatches ``J`` rows, or
-        ``alpha`` / ``rho`` are not positive finite scalars.
+        ``alpha`` is not a positive finite scalar.
 
     Notes
     -----
@@ -215,8 +217,6 @@ def tv_solve(
         raise ValueError(f"dV length {dV.shape[0]} does not match J rows {P}")
     if not (np.isfinite(alpha) and alpha > 0):
         raise ValueError(f"alpha must be a positive finite scalar, got {alpha!r}")
-    if not (np.isfinite(rho) and rho > 0):
-        raise ValueError(f"rho must be a positive finite scalar, got {rho!r}")
 
     # ── build gradient operator ───────────────────────────────────────────
     D = build_gradient_op(mesh)  # (F, E)  sparse CSR
@@ -226,8 +226,21 @@ def tv_solve(
     # H = J^T J + ρ D^T D  — symmetric positive definite
     JtJ = J.T @ J  # (E, E)  dense
     DtD = D.T @ D  # (E, E)  sparse
-    H = sp.csr_array(JtJ) + rho * DtD  # (E, E)  sparse
     Jt_dV = J.T @ dV  # (E,)    dense
+
+    # Auto-scale ρ so that JtJ and ρ DtD have commensurate magnitude.
+    # Without this the σ-update can be dominated by DtD, pushing the
+    # iterate into the (nearly constant) nullspace of D regardless of α.
+    if isinstance(rho, str) and rho == "auto":
+        tr_JtJ = float(np.trace(JtJ))
+        tr_DtD = float(DtD.diagonal().sum())
+        rho_val = tr_JtJ / tr_DtD if tr_DtD > 0 else 1e-6
+    else:
+        rho_val = float(rho)
+        if not (np.isfinite(rho_val) and rho_val > 0):
+            raise ValueError(f"rho must be a positive finite scalar, got {rho!r}")
+
+    H = sp.csr_array(JtJ) + rho_val * DtD  # (E, E)  sparse
 
     lu = spla.splu(H.tocsc())
 
@@ -240,12 +253,12 @@ def tv_solve(
     z = np.zeros(F_rows, dtype=np.float64)  # splitting variable
     u = np.zeros(F_rows, dtype=np.float64)  # scaled dual variable
 
-    kappa = alpha / rho  # soft-threshold level
+    kappa = alpha / rho_val  # soft-threshold level
 
     # ── ADMM iterations ───────────────────────────────────────────────────
     for _ in range(max_iter):
         # 1. σ-update: solve H ds = J^T dV + ρ D^T (z - u)
-        rhs = Jt_dV + rho * D.T @ (z - u)
+        rhs = Jt_dV + rho_val * D.T @ (z - u)
         ds = lu.solve(np.asarray(rhs).ravel())
 
         # 2. z-update: soft-threshold

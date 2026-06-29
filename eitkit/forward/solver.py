@@ -132,7 +132,9 @@ def solve_forward(
     symmetric.
     """
     N = K.shape[0]
-    if not (0 <= ground_node < N):
+    # Allow ground_node == -1 to signal that the Dirichlet BC has already
+    # been applied by the caller (e.g. via apply_dirichlet_bc).
+    if ground_node >= 0 and not (0 <= ground_node < N):
         raise ValueError(f"ground_node {ground_node} out of range [0, {N}).")
 
     # Apply Dirichlet BC and solve.
@@ -141,11 +143,11 @@ def solve_forward(
     # (with ground_node=-1 to skip the redundant modification).
     if ground_node >= 0:
         K_bc = apply_dirichlet_bc(K, ground_node)
+        f_mod = f.copy()
+        f_mod[ground_node] = 0.0
     else:
         K_bc = K  # caller already applied BC
-
-    f_mod = f.copy()
-    f_mod[ground_node] = 0.0
+        f_mod = np.asarray(f, dtype=np.float64)
 
     u = spla.spsolve(K_bc, f_mod)
     return u.astype(np.float64)

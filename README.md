@@ -1,8 +1,5 @@
 # eitkit — EIT Reconstruction Toolkit
 
-[![PyPI](https://img.shields.io/pypi/v/eitkit.svg)](https://pypi.org/project/eitkit/)
-[![Python](https://img.shields.io/pypi/pyversions/eitkit.svg)](https://pypi.org/project/eitkit/)
-[![Tests](https://github.com/abdgafartunde/eit-reconstruction-toolkit/actions/workflows/ci.yml/badge.svg)](https://github.com/abdgafartunde/eit-reconstruction-toolkit/actions)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
 A modular, research-grade Python package for **2-D Electrical Impedance Tomography (EIT)**:
@@ -24,11 +21,7 @@ forward simulation, Jacobian computation, and classical inverse reconstruction.
 
 ## Installation
 
-```bash
-pip install eitkit
-```
-
-Or install from source in editable mode:
+Install from source in editable mode:
 
 ```bash
 git clone https://github.com/abdgafartunde/eit-reconstruction-toolkit

@@ -103,10 +103,21 @@ def plot_mesh(
             zorder=5,
             label="electrodes",
         )
+        # Place labels just outside the boundary — use the actual
+        # boundary radius rather than a hard-coded scale factor.
+        bnd_radius = float(np.mean(np.sqrt(
+            mesh.nodes[mesh.boundary_nodes, 0] ** 2
+            + mesh.nodes[mesh.boundary_nodes, 1] ** 2
+        )))
+        label_offset = bnd_radius * 1.10 if bnd_radius > 0 else 1.10
         for i, (x, y) in enumerate(el_xy):
+            r = np.hypot(x, y)
+            if r < 1e-12:
+                r = 1.0
+            scale = label_offset / r
             ax.text(
-                x * 1.10,
-                y * 1.10,
+                x * scale,
+                y * scale,
                 str(i + 1),
                 fontsize=6,
                 ha="center",
@@ -208,13 +219,14 @@ def plot_voltages(
     symmetric: bool = True,
     **kwargs: Any,
 ) -> tuple[Figure, Axes]:
-    """Plot difference voltages as a 2-D heatmap.
+    """Plot difference voltages as an :math:`L \\times L` matrix.
 
-    The δV vector is reshaped to ``(n_electrodes, n_electrodes − 3)`` so
-    that rows correspond to drive steps and columns to measurement pairs
-    within each step.  For adjacent-drive EIT the largest magnitudes cluster
-    near the **main diagonal** because the electrode pairs closest to the
-    current-injection site carry the strongest signal.
+    Each measurement is placed at ``(drive_step, plus_electrode)`` in an
+    :math:`L \\times L` grid.  Unmeasured electrode pairs (driven
+    electrodes and their immediate neighbours) are shown in light grey.
+    For adjacent-drive EIT the largest voltage magnitudes cluster in
+    off-diagonal bands, giving the characteristic diagonal pattern seen
+    in the literature.
 
     Parameters
     ----------
@@ -224,8 +236,7 @@ def plot_voltages(
     dV:
         Difference voltage vector, shape ``(P,)``.
     n_electrodes:
-        Number of electrodes; determines the heatmap shape
-        ``(n_electrodes, n_electrodes − 3)``.
+        Number of electrodes :math:`L`.
     ax:
         Existing Axes to draw into.  If ``None`` a new figure is created.
     title:
@@ -244,50 +255,69 @@ def plot_voltages(
     fig, ax : Figure, Axes
     """
     dV = np.asarray(dV, dtype=np.float64)
-    n_per_step = n_electrodes - 3
-    expected = n_electrodes * n_per_step
+    L = n_electrodes
+    expected = L * (L - 3)
     if len(dV) != expected:
         raise ValueError(
             f"len(dV)={len(dV)} does not match "
-            f"n_electrodes × (n_electrodes−3) = {expected}."
+            f"L × (L−3) = {expected} for L={L}."
         )
 
-    # Reshape: rows = drive steps, cols = meas within each step
-    mat = dV.reshape(n_electrodes, n_per_step)
+    # Build L×L matrix — NaN where no measurement exists
+    mat = np.full((L, L), np.nan, dtype=np.float64)
+    for i in range(len(meas_pairs)):
+        k = int(meas_pairs[i, 0])        # drive step
+        plus_el = int(meas_pairs[i, 1])   # plus-electrode
+        mat[k, plus_el] = dV[i]
 
     if ax is None:
-        fig, ax = plt.subplots(figsize=(8, 5))
+        fig, ax = plt.subplots(figsize=(6, 5.5))
     else:
         fig = ax.get_figure()
 
-    vmax = float(np.abs(mat).max()) if symmetric else None
+    vmax = float(np.nanmax(np.abs(mat))) if symmetric else None
     vmin = -vmax if symmetric else None
 
+    # Use a masked array so NaN cells get the 'bad' colour
+    mat_masked = np.ma.masked_invalid(mat)
+    # Light grey for unmeasured cells
+    current_cmap = plt.colormaps.get_cmap(cmap).copy()
+    current_cmap.set_bad(color="0.85")
+
     im = ax.imshow(
-        mat,
-        aspect="auto",
+        mat_masked,
+        aspect="equal",
         origin="upper",
-        cmap=cmap,
+        cmap=current_cmap,
         vmin=vmin,
         vmax=vmax,
         interpolation="nearest",
         **kwargs,
     )
-    fig.colorbar(im, ax=ax, label="δV (V)", shrink=0.85)
+    cbar = fig.colorbar(im, ax=ax, label="δV (V)", shrink=0.82)
+
+    # Thin grid to delineate cells
+    ax.set_xticks(np.arange(-0.5, L, 1), minor=True)
+    ax.set_yticks(np.arange(-0.5, L, 1), minor=True)
+    ax.grid(which="minor", color="0.7", linewidth=0.3, alpha=0.6)
+    ax.tick_params(which="minor", size=0)
 
     if highlight_drive is not None:
-        ax.axhline(highlight_drive - 0.5, color="gold", linewidth=1.8, linestyle="--")
+        ax.axhline(
+            highlight_drive - 0.5, color="gold", linewidth=2.0, linestyle="--"
+        )
         ax.axhline(
             highlight_drive + 0.5,
             color="gold",
-            linewidth=1.8,
+            linewidth=2.0,
             linestyle="--",
             label=f"drive step {highlight_drive}",
         )
         ax.legend(fontsize=8, loc="upper right")
 
     ax.set_title(title)
-    ax.set_xlabel("Measurement pair index within drive step")
-    ax.set_ylabel("Drive step")
-    ax.set_yticks(range(0, n_electrodes, max(1, n_electrodes // 8)))
+    ax.set_xlabel("Measurement electrode  (+ terminal)")
+    ax.set_ylabel("Drive step  (source electrode)")
+    ax.set_xticks(range(0, L, max(1, L // 8)))
+    ax.set_yticks(range(0, L, max(1, L // 8)))
     return fig, ax

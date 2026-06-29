@@ -160,6 +160,7 @@ def choose_lambda(
     lambdas: NDArray[np.float64] | None = None,
     *,
     n_points: int = 50,
+    solver: str = "direct",
 ) -> tuple[float, NDArray[np.float64], NDArray[np.float64]]:
     r"""Select a regularisation parameter via the L-curve heuristic.
 
@@ -186,6 +187,10 @@ def choose_lambda(
         ``1e-6 * ||J||_F^2 / P`` to ``1e2 * ||J||_F^2 / P``.
     n_points:
         Number of log-spaced candidates when ``lambdas`` is ``None``.
+    solver:
+        Passed through to :func:`tikhonov_solve`.  ``"direct"`` (default)
+        uses the normal equations; ``"lsqr"`` uses an iterative solver
+        on the augmented system.
 
     Returns
     -------
@@ -220,7 +225,7 @@ def choose_lambda(
     solution_norms = np.empty(len(lambdas))
 
     for i, lam in enumerate(lambdas):
-        ds = tikhonov_solve(J, dV, float(lam))
+        ds = tikhonov_solve(J, dV, float(lam), solver=solver)
         residuals[i] = np.log10(np.linalg.norm(J @ ds - dV) + 1e-300)
         solution_norms[i] = np.log10(np.linalg.norm(ds) + 1e-300)
 

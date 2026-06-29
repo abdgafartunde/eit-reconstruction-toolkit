@@ -52,6 +52,9 @@ coverage.xml
 .pytest_cache/
 cover/
 
+# Generated figures
+figures/
+
 # Translations
 *.mo
 *.pot
