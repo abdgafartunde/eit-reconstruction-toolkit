@@ -39,43 +39,52 @@ from eitkit.mesh import make_circle_mesh, place_electrodes
 from eitkit.protocol import adjacent_pattern, measurement_pairs, add_noise
 from eitkit.forward import simulate, compute_jacobian
 from eitkit.utils import make_phantom, plot_conductivity
-from eitkit.inverse import tikhonov_solve, choose_lambda
+from eitkit.inverse import tikhonov_solve, tv_solve
 
 # 1. Build mesh and place 16 electrodes
-mesh = make_circle_mesh(n_electrodes=16, h0=0.07, seed=42)
+mesh = make_circle_mesh(n_electrodes=16, h0=0.08, seed=42)
 ec   = place_electrodes(mesh, n_electrodes=16)
 
-# 2. Define a two-inclusion phantom
+# 2. Define a two-inclusion phantom (moderate contrasts for linear regime)
 sigma = make_phantom(mesh, inclusions=[
-    {"shape": "circle", "cx": -0.4, "cy": 0.0, "r": 0.25, "sigma": 3.0},
-    {"shape": "circle", "cx":  0.4, "cy": 0.0, "r": 0.25, "sigma": 0.3},
+    {"shape": "circle",  "cx":  0.4, "cy":  0.3, "r": 0.22, "sigma": 1.6},
+    {"shape": "ellipse", "cx": -0.35, "cy": -0.25, "a": 0.25, "b": 0.14,
+     "theta": 0.6, "sigma": 0.5},
 ], sigma_background=1.0)
 
-# 3. Forward simulation → noisy difference voltages
+# 3. Forward simulation with noise
 drive_pairs = adjacent_pattern(16)
 meas_pairs  = measurement_pairs(16)
-dV = add_noise(simulate(mesh, ec, sigma, drive_pairs, meas_pairs), snr_db=40)
+dV = add_noise(simulate(mesh, ec, sigma, drive_pairs, meas_pairs),
+               snr_db=45.0, rng=42)
 
-# 4. Jacobian + L-curve + Tikhonov reconstruction
-sigma_ref = np.ones(len(mesh.elements))
+# 4. Jacobian + Tikhonov reconstruction
+sigma_ref = np.ones(mesh.n_elements)
 J = compute_jacobian(mesh, ec, sigma_ref, drive_pairs, meas_pairs)
-lambda_opt, _, _ = choose_lambda(J, dV)
-dsigma = tikhonov_solve(J, dV, lambda_=lambda_opt)
+dsigma_tik = tikhonov_solve(J, dV, lambda_=1e-7)
+sigma_tik  = sigma_ref + dsigma_tik
 
-plot_conductivity(mesh, sigma_ref + dsigma, title="Tikhonov reconstruction")
+# 5. TV / ADMM reconstruction (edge-preserving)
+dsigma_tv = tv_solve(J, dV, alpha=5e-8, mesh=mesh)
+sigma_tv  = sigma_ref + dsigma_tv
+
+plot_conductivity(mesh, sigma_tik, title="Tikhonov reconstruction")
 ```
 
-See [`examples/02_inverse_tikhonov.ipynb`](examples/02_inverse_tikhonov.ipynb)
-for a full walkthrough including TV/ADMM reconstruction and a side-by-side comparison.
+See [`examples/01_reconstruction_demo.ipynb`](examples/01_reconstruction_demo.ipynb)
+for a complete interactive walkthrough with configurable hyperparameters, preset
+phantoms, L-curve analysis, and side-by-side comparisons.
 
 ---
 
-## Examples
+## Documentation
 
-| Notebook | Description |
-|---|---|
-| [`01_forward_simulation.ipynb`](examples/01_forward_simulation.ipynb) | Mesh, phantom, forward solve, Jacobian, voltage map |
-| [`02_inverse_tikhonov.ipynb`](examples/02_inverse_tikhonov.ipynb) | L-curve, Tikhonov, TV/ADMM, comparison |
+- **[THEORY.md](THEORY.md)** — Full mathematical formulation (forward problem,
+  FEM discretisation, adjoint Jacobian, Tikhonov, TV/ADMM, DistMesh2D).
+- **[examples/01_reconstruction_demo.ipynb](examples/01_reconstruction_demo.ipynb)** —
+  Interactive notebook with configurable hyperparameters.
+- **[scripts/reconstruct_and_plot.py](scripts/reconstruct_and_plot.py)** —
+  Standalone script that generates publication-quality figures.
 
 ---
 
@@ -84,10 +93,4 @@ for a full walkthrough including TV/ADMM reconstruction and a side-by-side compa
 ```bash
 pytest tests/ -v          # 154 tests
 ```
-
----
-
-## License
-
-MIT — see [LICENSE](LICENSE).
 
