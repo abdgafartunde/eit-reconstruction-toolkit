@@ -250,6 +250,8 @@ AGENTS.md
 .cursor/
 instructions.txt
 *.lprof
+CHANGELOG.md
+.pre-commit-config.yaml
 
 # macOS
 .DS_Store
