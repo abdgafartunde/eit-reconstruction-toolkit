@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "eitkit"
-version = "0.1.0"
+version = "0.1.1"
 description = "A modular Python toolkit for Electrical Impedance Tomography: forward simulation, classical regularisation, and learning-based reconstruction."
 readme = "README.md"
 license = { file = "LICENSE" }
