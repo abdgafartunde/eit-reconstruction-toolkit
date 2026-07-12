@@ -1,7 +1,7 @@
 \documentclass[11pt,a4paper]{article}
 
 % ------------------------------------------------------------------ %
-%  eitkit — Technical Note (software companion document)
+%  eitkit --- Technical Note (software companion document)
 %  Version 0.1.1, July 2026
 % ------------------------------------------------------------------ %
 
@@ -15,6 +15,7 @@
 \usepackage{hyperref}
 \usepackage{enumitem}
 \usepackage{xcolor}
+\usepackage{abstract}
 
 \hypersetup{
   colorlinks=true,
@@ -27,12 +28,31 @@
 \title{\texttt{eitkit} --- Electrical Impedance Tomography\\[4pt]
        Reconstruction Toolkit}
 \author{Abd'gafar Tunde Tiamiyu\\[2pt]
-        \small Independent Researcher\\[2pt]
+        \small School of Mathematics, Jilin University\\[2pt]
         \small\texttt{abdgafartunde@yahoo.com}}
 \date{Version 0.1.1 --- July 2026}
 
+\renewcommand{\abstractname}{Summary}
+
 \begin{document}
 \maketitle
+
+\begin{abstract}
+\noindent
+\texttt{eitkit} is an open-source Python package for 2-D difference Electrical
+Impedance Tomography (EIT).  The forward problem is solved by P1 finite elements
+with a gap electrode model, and the Jacobian is computed by the adjoint method
+with sparse LU factorisation reuse.  Inverse reconstruction employs classical
+regularisation: Tikhonov (L$^2$) with L-curve parameter selection and Total
+Variation (L$^1$) via ADMM with auto-scaled penalty.  Mesh generation uses the
+DistMesh2D algorithm of Persson \& Strang~(2004).  The toolkit requires only
+NumPy, SciPy, and Matplotlib.  Version~0.1.1 ships with a demo notebook, five
+synthetic phantom shapes, and 154~unit tests.
+
+\smallskip
+\noindent\textbf{DOI:} \url{https://doi.org/10.5281/zenodo.21319128}\\
+\textbf{Source:} \url{https://github.com/abdgafartunde/eit-reconstruction-toolkit}
+\end{abstract}
 
 % ------------------------------------------------------------------ %
 \section{Overview}
@@ -44,8 +64,7 @@ Calder\'on~\cite{Calderon1980}, is severely ill-posed: small perturbations in
 boundary data can induce arbitrarily large errors in any
 reconstruction~\citep{Mandache2001}.
 
-\texttt{eitkit} is an open-source Python package that implements the complete
-\textbf{difference EIT} pipeline:
+\texttt{eitkit} implements the complete \textbf{difference EIT} pipeline:
 
 \begin{center}
 \begin{tabular}{@{}ll@{}}
@@ -59,12 +78,6 @@ Inverse problem  & Tikhonov (L$^2$) + L-curve and TV (L$^1$) via ADMM \\
 \bottomrule
 \end{tabular}
 \end{center}
-
-The toolkit requires only NumPy, SciPy, and Matplotlib. Version~0.1.1 provides
-a demo notebook, five synthetic phantom shapes, and 154~unit tests.
-The source code, installation instructions, and interactive examples are
-available at\\[2pt]
-\centerline{\url{https://github.com/abdgafartunde/eit-reconstruction-toolkit}}
 
 % ------------------------------------------------------------------ %
 \section{Forward Problem}
@@ -188,21 +201,33 @@ $z$-update is element-wise soft-thresholding, and the penalty parameter $\rho$
 is auto-scaled as $\rho=\operatorname{tr}(J^T J)/\operatorname{tr}(D^T D)$.
 
 % ------------------------------------------------------------------ %
-\section{Package Structure}
+\section{Package Structure and Availability}
 
+\begin{center}
+\begin{tabular}{@{}ll@{}}
+\toprule
+Module & Contents \\
+\midrule
+\texttt{eitkit.mesh}    & DistMesh2D mesh generation, electrode placement \\
+\texttt{eitkit.forward} & P1 FEM assembly, gap electrode model, adjoint Jacobian \\
+\texttt{eitkit.protocol}& Adjacent drive and measurement patterns, AWGN noise \\
+\texttt{eitkit.inverse} & Tikhonov (L$^2$) + L-curve, TV-ADMM (L$^1$) \\
+\texttt{eitkit.utils}   & Five phantom shapes, publication-quality visualisation \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+Installation from source:
 \begin{verbatim}
-eitkit/
-  mesh/          DistMesh2D generation, electrode placement
-  forward/       P1 FEM assembly, gap model, adjoint Jacobian
-  protocol/      Adjacent drive/meas patterns, AWGN noise
-  inverse/
-    classical/   Tikhonov + L-curve, TV-ADMM
-  utils/         Phantom shapes (5), publication-quality plots
+git clone https://github.com/abdgafartunde/eit-reconstruction-toolkit
+cd eit-reconstruction-toolkit
+pip install -e ".[dev]"
 \end{verbatim}
 
 The core dependency stack is NumPy $\ge$\,1.24, SciPy $\ge$\,1.10, and
-Matplotlib $\ge$\,3.7. Optional extras include PyTorch and JAX for future
-learning-based extensions.
+Matplotlib $\ge$\,3.7.  Optional extras include PyTorch and JAX for future
+learning-based extensions.  A complete interactive example is provided in
+\texttt{examples/01\_reconstruction\_demo.ipynb}.
 
 % ------------------------------------------------------------------ %
 \section{References}
