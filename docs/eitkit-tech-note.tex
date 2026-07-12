@@ -25,19 +25,31 @@
 }
 
 % ------------------------------------------------------------------ %
-\title{\texttt{eitkit} --- Electrical Impedance Tomography\\[4pt]
-       Reconstruction Toolkit}
-\author{Abd'gafar Tunde Tiamiyu\\[2pt]
-        \small School of Mathematics, Jilin University\\[2pt]
-        \small Changchun 130012, Jilin, China\\[2pt]
-        \small\texttt{abdgafartunde@yahoo.com}}
-\date{Version 0.1.1 --- July 2026}
+%  Custom title block
+% ------------------------------------------------------------------ %
+\newcommand{\seprule}{\vspace{4pt}\noindent\rule{\textwidth}{0.5pt}\vspace{4pt}}
 
-\renewcommand{\abstractname}{Summary}
+\title{}
+\author{}
+\date{}
 
 \begin{document}
-\maketitle
+%\maketitle  % suppressed — custom title block used instead
 
+\begin{center}
+{\LARGE\bfseries\texttt{eitkit}}\\[6pt]
+{\Large\bfseries Electrical Impedance Tomography\\[2pt]
+ Reconstruction Toolkit}\\[14pt]
+{\large Abd'gafar Tunde Tiamiyu}\\[4pt]
+{\small School of Mathematics, Jilin University\\[2pt]
+ Changchun 130012, Jilin, China}\\[4pt]
+{\small\texttt{abdgafartunde@yahoo.com}}\\[12pt]
+{\small\bfseries Version 0.1.1 --- July 2026}\\[4pt]
+{\small DOI: \texttt{10.5281/zenodo.21319128}}\\[4pt]
+\seprule
+\end{center}
+
+\renewcommand{\abstractname}{Summary}
 \begin{abstract}
 \noindent
 \texttt{eitkit} is an open-source Python package for 2-D difference Electrical
@@ -49,10 +61,6 @@ Variation (L$^1$) via ADMM with auto-scaled penalty.  Mesh generation uses the
 DistMesh2D algorithm of Persson \& Strang~(2004).  The toolkit requires only
 NumPy, SciPy, and Matplotlib.  Version~0.1.1 ships with a demo notebook, five
 synthetic phantom shapes, and 154~unit tests.
-
-\smallskip
-\noindent\textbf{DOI:} \url{https://doi.org/10.5281/zenodo.21319128}\\
-\textbf{Source:} \url{https://github.com/abdgafartunde/eit-reconstruction-toolkit}
 \end{abstract}
 
 % ------------------------------------------------------------------ %
