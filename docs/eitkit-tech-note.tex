@@ -1,0 +1,247 @@
+\documentclass[11pt,a4paper]{article}
+
+% ------------------------------------------------------------------ %
+%  eitkit — Technical Note (software companion document)
+%  Version 0.1.1, July 2026
+% ------------------------------------------------------------------ %
+
+\usepackage[american]{babel}
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage{amsmath,amssymb}
+\usepackage{booktabs}
+\usepackage[margin=2.5cm]{geometry}
+\usepackage[numbers,sort&compress]{natbib}
+\usepackage{hyperref}
+\usepackage{enumitem}
+\usepackage{xcolor}
+
+\hypersetup{
+  colorlinks=true,
+  linkcolor=blue!40!black,
+  citecolor=blue!40!black,
+  urlcolor=blue!40!black,
+}
+
+% ------------------------------------------------------------------ %
+\title{\texttt{eitkit} --- Electrical Impedance Tomography\\[4pt]
+       Reconstruction Toolkit}
+\author{Abd'gafar Tunde Tiamiyu\\[2pt]
+        \small Independent Researcher\\[2pt]
+        \small\texttt{abdgafartunde@yahoo.com}}
+\date{Version 0.1.1 --- July 2026}
+
+\begin{document}
+\maketitle
+
+% ------------------------------------------------------------------ %
+\section{Overview}
+
+\textbf{Electrical Impedance Tomography (EIT)} reconstructs the interior
+conductivity distribution $\sigma(x)$ of a domain $\Omega\subset\mathbb{R}^2$
+from boundary voltage measurements. The mathematical problem, posed by
+Calder\'on~\cite{Calderon1980}, is severely ill-posed: small perturbations in
+boundary data can induce arbitrarily large errors in any
+reconstruction~\citep{Mandache2001}.
+
+\texttt{eitkit} is an open-source Python package that implements the complete
+\textbf{difference EIT} pipeline:
+
+\begin{center}
+\begin{tabular}{@{}ll@{}}
+\toprule
+Stage          & Implementation \\
+\midrule
+Mesh generation  & DistMesh2D triangular mesh on the unit disc \\
+Forward problem  & P1-FEM with gap electrode model \\
+Jacobian         & Adjoint method with sparse LU factorisation reuse \\
+Inverse problem  & Tikhonov (L$^2$) + L-curve and TV (L$^1$) via ADMM \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+The toolkit requires only NumPy, SciPy, and Matplotlib. Version~0.1.1 provides
+a demo notebook, five synthetic phantom shapes, and 154~unit tests.
+The source code, installation instructions, and interactive examples are
+available at\\[2pt]
+\centerline{\url{https://github.com/abdgafartunde/eit-reconstruction-toolkit}}
+
+% ------------------------------------------------------------------ %
+\section{Forward Problem}
+
+\subsection{Governing Equation}
+
+Let $\Omega\subset\mathbb{R}^2$ be a bounded Lipschitz domain. Given a
+conductivity $\sigma\in L^\infty(\Omega)$ with $\sigma(x)\ge c>0$, the electric
+potential $u\in H^1(\Omega)$ satisfies
+\begin{align}
+-\nabla\cdot(\sigma\nabla u) &= 0      \quad\text{in }\Omega,
+\label{eq:pde}\\[4pt]
+\sigma\frac{\partial u}{\partial n} &= j \quad\text{on }\partial\Omega,
+\label{eq:bc}
+\end{align}
+where $j$ is the applied current density with
+$\int_{\partial\Omega}j\,ds=0$. A ground condition $u(x_0)=0$ at one
+interior node ensures uniqueness.
+
+\subsection{Gap Electrode Model}
+
+Each of the $L$ electrodes is modelled as a single boundary node.
+A stimulation pair $(e^+,e^-)$ injects current $+I$ at electrode $e^+$ and
+extracts $-I$ at $e^-$. The Neumann load vector $f\in\mathbb{R}^N$ has entries
+\[
+f_i = \begin{cases}
++I & \text{node $i$ is electrode $e^+$},\\[2pt]
+-I & \text{node $i$ is electrode $e^-$},\\[2pt]
+0  & \text{otherwise}.
+\end{cases}
+\]
+
+\subsection{P1 Finite Element Discretisation}
+
+The domain is triangulated with $M$ linear elements on $N$ nodes.
+Writing $u=\sum_{i=1}^N u_i\varphi_i$ with P1 hat functions
+$\varphi_i$, the weak form yields
+\begin{equation}
+K(\sigma)\,u = f,
+\label{eq:Ksystem}
+\end{equation}
+where the global stiffness matrix is assembled element-wise:
+\[
+K = \sum_{e=1}^{M} K^e, \qquad
+K^e_{ij} = \frac{\sigma_e}{4A_e}(b_i b_j + c_i c_j), \quad i,j\in\{0,1,2\}.
+\]
+The gradient coefficients are $b_i=y_{i+1}-y_{i+2}$,
+$c_i=x_{i+2}-x_{i+1}$ (indices mod~3), and $A_e$ is the element area.
+Assembly is vectorised over elements using NumPy advanced indexing, producing a
+\texttt{csr\_array} for efficient sparse arithmetic.
+
+\subsection{Measurement Protocol}
+
+The standard \textbf{adjacent drive / adjacent measurement} protocol is used.
+For $L$ electrodes there are $L$ drive steps; step~$k$ sources current at
+electrode~$k$ and sinks at $(k+1)\bmod L$. Per drive step, $L-3$ voltage
+measurements are taken across adjacent electrode pairs $(k+2,k+3),\dots,(k+L-2,k+L-1)$
+(all indices modulo~$L$). The total number of measurements is $P=L(L-3)$; for
+$L=16$ this gives $P=208$.
+
+\subsection{Difference EIT and the Jacobian}
+
+Absolute voltages are difficult to calibrate experimentally. Difference EIT
+measures voltage changes relative to a reference state $\sigma_0$:
+$\delta V = V(\sigma)-V(\sigma_0)$. Linearising around $\sigma_0$ gives the
+Born approximation
+\begin{equation}
+\delta V \approx J(\sigma_0)\,\delta\sigma,
+\label{eq:born}
+\end{equation}
+where $J\in\mathbb{R}^{P\times M}$ is the Jacobian and
+$\delta\sigma=\sigma-\sigma_0\in\mathbb{R}^M$ is the conductivity perturbation.
+
+The Jacobian is computed by the \textbf{adjoint method}. For measurement~$i$
+associated with drive step~$k$ and electrode pair $(e^+,e^-)$,
+\begin{equation}
+J_{ie} = -\int_{\Omega_e} \nabla u_k\cdot\nabla\phi_i\,d\Omega,
+\label{eq:adjoint}
+\end{equation}
+where $u_k$ is the forward potential for drive step~$k$ and $\phi_i$ is the
+adjoint potential (unit current injected at $e^+$, extracted at $e^-$).
+For the adjacent protocol, at most $L$ adjoint solves are needed, and the
+factorised stiffness matrix is reused for all solves via
+\texttt{scipy.sparse.linalg.splu}.
+
+% ------------------------------------------------------------------ %
+\section{Inverse Problem}
+
+\subsection{Tikhonov Regularisation (L$^2$)}
+
+The Tikhonov solution minimises
+\begin{equation}
+\delta\hat\sigma =
+\arg\min_{\delta\sigma}\Bigl\{
+\tfrac12\|J\delta\sigma-\delta V\|_2^2
++ \lambda\|\delta\sigma\|_2^2
+\Bigr\},
+\label{eq:tikhonov}
+\end{equation}
+with closed-form solution $\delta\hat\sigma=(J^T J+\lambda I)^{-1}J^T\delta V$.
+The regularisation parameter $\lambda$ is chosen automatically via the L-curve
+method~\citep{Hansen1992}: the optimal $\lambda$ corresponds to the point of
+maximum curvature on the log-log plot of residual norm against solution norm.
+
+\subsection{Total Variation (L$^1$ / ADMM)}
+
+TV regularisation promotes piecewise-constant reconstructions:
+\begin{equation}
+\delta\hat\sigma =
+\arg\min_{\delta\sigma}\Bigl\{
+\tfrac12\|J\delta\sigma-\delta V\|_2^2
++ \alpha\|D\delta\sigma\|_1
+\Bigr\},
+\label{eq:tv}
+\end{equation}
+where $D\in\mathbb{R}^{F\times M}$ is a sparse finite-difference operator on
+element-to-element edges. The problem is solved by the Alternating Direction
+Method of Multipliers (ADMM)~\citep{Boyd2011} with splitting $z=D\delta\sigma$.
+The $\sigma$-update is a quadratic system solved by direct factorisation, the
+$z$-update is element-wise soft-thresholding, and the penalty parameter $\rho$
+is auto-scaled as $\rho=\operatorname{tr}(J^T J)/\operatorname{tr}(D^T D)$.
+
+% ------------------------------------------------------------------ %
+\section{Package Structure}
+
+\begin{verbatim}
+eitkit/
+  mesh/          DistMesh2D generation, electrode placement
+  forward/       P1 FEM assembly, gap model, adjoint Jacobian
+  protocol/      Adjacent drive/meas patterns, AWGN noise
+  inverse/
+    classical/   Tikhonov + L-curve, TV-ADMM
+  utils/         Phantom shapes (5), publication-quality plots
+\end{verbatim}
+
+The core dependency stack is NumPy $\ge$\,1.24, SciPy $\ge$\,1.10, and
+Matplotlib $\ge$\,3.7. Optional extras include PyTorch and JAX for future
+learning-based extensions.
+
+% ------------------------------------------------------------------ %
+\section{References}
+
+\begin{thebibliography}{10}
+
+\bibitem{Calderon1980}
+A.P.~Calder\'on.
+\newblock On an inverse boundary value problem.
+\newblock In \emph{Seminar on Numerical Analysis and its Applications to
+  Continuum Physics}, Rio de Janeiro, 1980.
+
+\bibitem{Mandache2001}
+N.~Mandache.
+\newblock Exponential instability in an inverse problem for the Schr\"odinger
+  equation.
+\newblock \emph{Inverse Problems}, 17(5):1435--1444, 2001.
+
+\bibitem{PerssonStrang2004}
+P.-O.~Persson and G.~Strang.
+\newblock A simple mesh generator in MATLAB.
+\newblock \emph{SIAM Review}, 46(2):329--345, 2004.
+
+\bibitem{Hansen1992}
+P.C.~Hansen.
+\newblock Analysis of discrete ill-posed problems by means of the L-curve.
+\newblock \emph{SIAM Review}, 34(4):561--580, 1992.
+
+\bibitem{Boyd2011}
+S.~Boyd, N.~Parikh, E.~Chu, B.~Peleato, and J.~Eckstein.
+\newblock Distributed optimization and statistical learning via the alternating
+  direction method of multipliers.
+\newblock \emph{Foundations and Trends in Machine Learning}, 3(1):1--122, 2011.
+
+\bibitem{AdlerLionheart2006}
+A.~Adler and W.R.B.~Lionheart.
+\newblock Uses and abuses of EIDORS: an extensible software base for EIT.
+\newblock \emph{Physiological Measurement}, 27(5):S25--S42, 2006.
+
+\end{thebibliography}
+
+\end{document}

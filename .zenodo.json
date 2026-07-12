@@ -1,6 +1,6 @@
 {
   "title": "eitkit — Electrical Impedance Tomography Reconstruction Toolkit",
-  "description": "A modular, research-grade Python package for 2-D Electrical Impedance Tomography (EIT): forward simulation using P1 finite elements with a gap electrode model, adjoint-method Jacobian computation, and classical regularisation-based inverse reconstruction (Tikhonov with L-curve heuristic and Total Variation via ADMM). Mesh generation uses the DistMesh2D algorithm of Persson & Strang (2004).",
+  "description": "A modular Python package for 2-D difference Electrical Impedance Tomography. The forward problem is solved by P1 finite elements with a gap electrode model and the Jacobian is computed by the adjoint method with sparse LU factorisation reuse. Inverse reconstruction employs classical regularisation: Tikhonov (L^2) with L-curve parameter selection and Total Variation (L^1) via ADMM with auto-scaled penalty. Mesh generation uses the DistMesh2D algorithm of Persson & Strang (2004). The toolkit runs on NumPy, SciPy, and Matplotlib with no external mesh libraries required.",
   "creators": [
     {
       "name": "Tiamiyu, Abd'gafar Tunde",
