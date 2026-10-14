@@ -118,7 +118,7 @@ print(f"  L-curve λ_opt = {lam_opt:.2e} (shown for reference; using fixed λ={l
 print("TV reconstruction (ADMM) …")
 D = build_gradient_op(mesh)
 ds_tv = tv_solve(J, dV_noisy, alpha=5e-8, mesh=mesh, rho="auto",
-                  max_iter=300, tol=1e-4)
+                  tol=1e-4)  # stops once converged (~3300 iterations)
 sigma_tv = sigma_bg + ds_tv
 print(f"  ‖δσ_tv‖ = {np.linalg.norm(ds_tv):.4f}")
 print(f"  δσ range  = [{ds_tv.min():.3f}, {ds_tv.max():.3f}] S/m")

@@ -40,7 +40,8 @@ Introduce splitting :math:`z = D\,\delta\sigma` and solve via ADMM:
 
        u^{k+1} = u^k + D\,\delta\sigma^{k+1} - z^{k+1}
 
-Convergence is checked by primal and dual residual norms.
+Iterations stop when both the primal residual and the dual residual are
+small relative to the iterates (Boyd et al. 2011, Section 3.3.1).
 
 Public API
 ----------
@@ -49,6 +50,8 @@ tv_solve            Reconstruct δσ via ADMM TV minimisation.
 """
 
 from __future__ import annotations
+
+import warnings
 
 import numpy as np
 import scipy.sparse as sp
@@ -140,8 +143,9 @@ def tv_solve(
     mesh: Mesh,
     *,
     rho: float | str = "auto",
-    max_iter: int = 200,
+    max_iter: int = 50000,
     tol: float = 1e-4,
+    abs_tol: float = 1e-8,
     warm_start: NDArray[np.float64] | None = None,
 ) -> NDArray[np.float64]:
     r"""Total Variation regularised EIT reconstruction via ADMM.
@@ -173,13 +177,28 @@ def tv_solve(
         so that the two quadratic terms in the augmented Lagrangian
         have commensurate scale.  Otherwise a positive float.
     max_iter:
-        Maximum number of ADMM iterations.
-    tol:
-        Convergence tolerance on the relative primal residual
-        ``||D δσ − z|| / max(||D δσ||, ||z||, 1)``.
+        Maximum number of ADMM iterations.  ADMM converges slowly, and
+        more slowly for small ``alpha``: for the demo problem (1126
+        triangles, ``tol=1e-4``) the stopping test is met after about
+        1500 iterations at ``alpha=2e-7``, 3300 at ``5e-8``, and 24000 at
+        ``1e-8``.  A ``RuntimeWarning`` is issued if the limit is reached
+        first.
+    tol, abs_tol:
+        Relative and absolute tolerances of the stopping test (Boyd et
+        al. 2011, Section 3.3.1): stop when the primal residual satisfies
+        ``||D δσ − z|| <= sqrt(F) * abs_tol + tol * max(||D δσ||, ||z||)``
+        and the dual residual satisfies
+        ``rho * ||D^T (z − z_prev)|| <= rho * (sqrt(E) * abs_tol + tol * ||D^T u||)``,
+        where ``F`` is the number of interior edges.  ``abs_tol`` is in
+        units of ``delta_sigma`` and matters only when the solution is
+        (nearly) constant, so that the relative terms vanish.
     warm_start:
-        Optional initial guess for ``delta_sigma``, shape ``(E,)``.
-        Defaults to the zero vector.
+        Optional initial guess for ``delta_sigma``, shape ``(E,)``, for
+        example the solution for a nearby ``alpha``.  It initialises the
+        splitting variable as ``z = D @ warm_start``; the scaled dual
+        variable restarts at zero, so a warm start changes the early
+        iterates but does not necessarily shorten the run.  Defaults to
+        zero.
 
     Returns
     -------
@@ -245,12 +264,16 @@ def tv_solve(
     lu = spla.splu(H.tocsc())
 
     # ── initialise ADMM variables ─────────────────────────────────────────
+    # The δσ-update overwrites ds in the first iteration, so a warm start
+    # takes effect through the splitting variable z = D @ warm_start.
     if warm_start is not None:
         ds = np.asarray(warm_start, dtype=np.float64).copy()
+        if ds.shape != (E,):
+            raise ValueError(f"warm_start must have shape ({E},), got {ds.shape}")
+        z = np.asarray(D @ ds).ravel()  # splitting variable
     else:
         ds = np.zeros(E, dtype=np.float64)
-
-    z = np.zeros(F_rows, dtype=np.float64)  # splitting variable
+        z = np.zeros(F_rows, dtype=np.float64)  # splitting variable
     u = np.zeros(F_rows, dtype=np.float64)  # scaled dual variable
 
     kappa = alpha / rho_val  # soft-threshold level
@@ -268,11 +291,23 @@ def tv_solve(
         # 3. u-update: dual ascent
         u = u + Dds - z_new
 
-        # 4. convergence check on primal residual ||D ds - z||
+        # 4. stopping test on the primal and dual residuals (Boyd et al.
+        #    2011, Section 3.3.1)
         primal_res = np.linalg.norm(Dds - z_new)
-        scale = max(np.linalg.norm(Dds), np.linalg.norm(z_new), 1.0)
+        dual_res = rho_val * np.linalg.norm(D.T @ (z_new - z))
+        primal_tol = np.sqrt(F_rows) * abs_tol + tol * max(
+            np.linalg.norm(Dds), np.linalg.norm(z_new)
+        )
+        dual_tol = rho_val * (np.sqrt(E) * abs_tol + tol * np.linalg.norm(D.T @ u))
         z = z_new
-        if primal_res / scale < tol:
+        if primal_res <= primal_tol and dual_res <= dual_tol:
             break
+    else:
+        warnings.warn(
+            f"tv_solve: ADMM reached max_iter={max_iter} before meeting "
+            f"tol={tol}; the result may not be converged. Increase max_iter.",
+            RuntimeWarning,
+            stacklevel=2,
+        )
 
     return ds.astype(np.float64)

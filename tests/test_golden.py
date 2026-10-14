@@ -33,7 +33,7 @@ CONFIG = {
     "seed": 42,
     "lambda_tik": 1e-7,
     "alpha_tv": 5e-8,
-    "tv_max_iter": 300,
+    "tv_max_iter": 50000,  # ADMM stops at its tolerance well before this
 }
 INCLUSIONS = [
     {"shape": "circle", "cx": 0.40, "cy": 0.30, "r": 0.22, "sigma": 1.6},

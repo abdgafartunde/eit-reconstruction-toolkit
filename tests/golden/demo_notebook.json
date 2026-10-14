@@ -7,6 +7,6 @@
   "linearisation_error": 0.2686320303526612,
   "tikhonov_rel_error": 0.5790298168708461,
   "tikhonov_rel_residual": 0.01702761973989087,
-  "tv_rel_error": 0.42649840070369804,
-  "tv_rel_residual": 0.016164171319397205
+  "tv_rel_error": 0.3951539150047593,
+  "tv_rel_residual": 0.015928957106950768
 }

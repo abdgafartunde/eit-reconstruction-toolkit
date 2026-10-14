@@ -260,3 +260,70 @@ class TestIntegration:
         J, dV = forward_data
         ds = tv_top(J, dV, alpha=1e-2, mesh=circle_mesh)
         assert ds.shape == (circle_mesh.n_elements,)
+
+
+class TestStoppingAndWarmStart:
+    """ADMM must stop on both residuals, and warm_start must take effect."""
+
+    @pytest.fixture(scope="class")
+    @classmethod
+    def problem(cls, circle_mesh, electrodes):
+        from eitkit.forward import compute_jacobian, simulate
+        from eitkit.protocol import adjacent_pattern, measurement_pairs
+        from eitkit.utils import make_phantom
+
+        drive, meas = adjacent_pattern(16), measurement_pairs(16)
+        sigma = make_phantom(
+            circle_mesh,
+            [{"shape": "circle", "cx": 0.3, "cy": 0.2, "r": 0.25, "sigma": 1.5}],
+            sigma_background=1.0,
+        )
+        dV = simulate(circle_mesh, electrodes, sigma, drive, meas)
+        J = compute_jacobian(circle_mesh, electrodes, np.ones(circle_mesh.n_elements),
+                             drive, meas)
+        return J, dV, circle_mesh
+
+    @staticmethod
+    def _objective(J, dV, D, alpha, x):
+        return 0.5 * np.linalg.norm(J @ x - dV) ** 2 + alpha * np.abs(D @ x).sum()
+
+    def test_default_run_reaches_the_minimum(self, problem):
+        J, dV, mesh = problem
+        D = build_gradient_op(mesh)
+        alpha = 1e-7
+        x = tv_solve(J, dV, alpha, mesh)
+        with pytest.warns(RuntimeWarning):  # zero tolerances never stop early
+            ref = tv_solve(J, dV, alpha, mesh, max_iter=20000, tol=0.0, abs_tol=0.0)
+        f, f_ref = (self._objective(J, dV, D, alpha, v) for v in (x, ref))
+        assert f <= f_ref * (1 + 1e-4)
+
+    def test_warm_start_changes_the_iterates(self, problem):
+        J, dV, mesh = problem
+        # a non-constant start (D maps constants to zero)
+        x0 = np.random.default_rng(0).standard_normal(mesh.n_elements)
+        with pytest.warns(RuntimeWarning):
+            cold = tv_solve(J, dV, 1e-7, mesh, max_iter=1)
+        with pytest.warns(RuntimeWarning):
+            warm = tv_solve(J, dV, 1e-7, mesh, max_iter=1, warm_start=x0)
+        assert not np.allclose(cold, warm)
+
+    def test_warm_start_shape_is_checked(self, problem):
+        J, dV, mesh = problem
+        with pytest.raises(ValueError):
+            tv_solve(J, dV, 1e-7, mesh, warm_start=np.zeros(3))
+
+    def test_warns_when_not_converged(self, problem):
+        J, dV, mesh = problem
+        with pytest.warns(RuntimeWarning, match="max_iter"):
+            tv_solve(J, dV, 1e-7, mesh, max_iter=5)
+
+    def test_constant_solution_stops(self, coarse_mesh):
+        """A constant solution makes the relative tolerances vanish; the
+        absolute tolerance must still stop the iteration."""
+        import warnings
+
+        E = coarse_mesh.n_elements
+        with warnings.catch_warnings():
+            warnings.simplefilter("error", RuntimeWarning)
+            ds = tv_solve(np.eye(E), np.full(E, 0.5), alpha=1e-3, mesh=coarse_mesh)
+        np.testing.assert_allclose(ds, 0.5, atol=1e-6)
