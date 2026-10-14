@@ -284,3 +284,65 @@ class TestIntegration:
         J, dV, _, _ = forward_data
         lam_opt, _, _ = choose_lambda(J, dV, n_points=20)
         assert lam_opt > 0.0
+
+
+class TestLCurveCorner:
+    """The L-curve corner must use the true curvature (Hansen 1992).
+
+    The previous unnormalised curvature proxy returned the same lambda at
+    every noise level and over-smoothed the reconstruction.
+    """
+
+    @pytest.fixture(scope="class")
+    @classmethod
+    def eit_system(cls):
+        from eitkit.forward import compute_jacobian, simulate
+        from eitkit.mesh import make_circle_mesh, place_electrodes
+        from eitkit.protocol import adjacent_pattern, measurement_pairs
+        from eitkit.utils import make_phantom
+
+        mesh = make_circle_mesh(n_electrodes=16, h0=0.1, seed=42)
+        ec = place_electrodes(mesh, n_electrodes=16)
+        drive, meas = adjacent_pattern(16), measurement_pairs(16)
+        sigma = make_phantom(
+            mesh,
+            [{"shape": "circle", "cx": 0.4, "cy": 0.3, "r": 0.22, "sigma": 1.6}],
+            sigma_background=1.0,
+        )
+        dV = simulate(mesh, ec, sigma, drive, meas)
+        J = compute_jacobian(mesh, ec, np.ones(mesh.n_elements), drive, meas)
+        return J, dV, sigma - 1.0
+
+    def test_corner_moves_with_noise_level(self, eit_system):
+        from eitkit.protocol import add_noise
+
+        J, dV, _ = eit_system
+        lam_noisy, _, _ = choose_lambda(J, add_noise(dV, snr_db=30, rng=0))
+        lam_clean, _, _ = choose_lambda(J, add_noise(dV, snr_db=60, rng=0))
+        assert lam_noisy > lam_clean
+
+    def test_corner_independent_of_candidate_order(self, eit_system):
+        J, dV, _ = eit_system
+        lambdas = np.logspace(-11, -3, 33)
+        lam_up, res_up, _ = choose_lambda(J, dV, lambdas=lambdas)
+        lam_down, res_down, _ = choose_lambda(J, dV, lambdas=lambdas[::-1])
+        assert lam_up == lam_down
+        np.testing.assert_allclose(res_down, res_up[::-1])
+
+    def test_corner_gives_reasonable_reconstruction(self, eit_system):
+        from eitkit.protocol import add_noise
+
+        J, dV, delta_true = eit_system
+        dV_noisy = add_noise(dV, snr_db=40, rng=0)
+        lam, _, _ = choose_lambda(J, dV_noisy)
+        err = np.linalg.norm(tikhonov_solve(J, dV_noisy, lam) - delta_true)
+        best = min(
+            np.linalg.norm(tikhonov_solve(J, dV_noisy, x) - delta_true)
+            for x in np.logspace(-11, -3, 33)
+        )
+        assert err < 1.25 * best
+
+    def test_needs_three_candidates(self, eit_system):
+        J, dV, _ = eit_system
+        with pytest.raises(ValueError):
+            choose_lambda(J, dV, lambdas=np.array([1e-8, 1e-6]))

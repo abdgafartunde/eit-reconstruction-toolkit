@@ -203,8 +203,9 @@ def choose_lambda(
 
     Notes
     -----
-    Curvature is estimated from the discrete second derivative of the
-    L-curve in log-log space using the standard formula [Hansen1992]_.
+    The corner is the point of maximum signed curvature of the L-curve in
+    log-log space, with derivatives taken with respect to
+    :math:`\\log_{10}\\lambda` by finite differences [Hansen1992]_.
 
     .. [Hansen1992] Hansen, P.C. (1992). Analysis of discrete ill-posed problems
        by means of the L-curve. *SIAM Review*, 34(4), 561–580.
@@ -229,19 +230,24 @@ def choose_lambda(
         residuals[i] = np.log10(np.linalg.norm(J @ ds - dV) + 1e-300)
         solution_norms[i] = np.log10(np.linalg.norm(ds) + 1e-300)
 
-    # Maximum-curvature corner via discrete second derivative
-    # curvature proxy κ_i ≈ x''y' - x'y'' (unnormalised, sign-consistent)
-    x = residuals
-    y = solution_norms
-    # first differences
-    dx = np.diff(x)
-    dy = np.diff(y)
-    # second differences (align to interior points)
-    d2x = np.diff(dx)
-    d2y = np.diff(dy)
-    # curvature numerator (interior points only: indices 1..-1)
-    kappa = np.abs(dx[:-1] * d2y - dy[:-1] * d2x)
-    corner_idx = int(np.argmax(kappa)) + 1  # +1: offset back to full array
+    # Maximum-curvature corner (Hansen 1992): the signed curvature of the
+    # curve (x(t), y(t)) with t = log10(lambda),
+    #     kappa = (x' y'' - y' x'') / (x'^2 + y'^2)^(3/2).
+    # The denominator matters: without it the "corner" lands wherever the
+    # curve moves fastest per unit t, independently of the noise level.
+    if len(lambdas) < 3:
+        raise ValueError("choose_lambda needs at least 3 candidate values")
+    # Evaluate the curvature along increasing lambda (its sign depends on
+    # the direction of travel); the returned arrays keep the caller's order.
+    order = np.argsort(lambdas)
+    t = np.log10(lambdas[order])
+    dx = np.gradient(residuals[order], t)
+    dy = np.gradient(solution_norms[order], t)
+    d2x = np.gradient(dx, t)
+    d2y = np.gradient(dy, t)
+    speed = np.maximum(dx**2 + dy**2, 1e-300)
+    kappa = (dx * d2y - dy * d2x) / speed**1.5
+    corner_idx = int(order[int(np.argmax(kappa[1:-1])) + 1])  # interior points only
     lambda_opt = float(lambdas[corner_idx])
 
     return lambda_opt, residuals, solution_norms

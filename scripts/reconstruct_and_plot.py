@@ -159,9 +159,10 @@ plt.close(fig)
 fig, ax = plt.subplots(figsize=(5.5, 4.5))
 fig.suptitle("L-Curve — Tikhonov Regularisation", fontsize=12, fontweight="bold")
 ax.plot(residuals, sol_norms, "o-", markersize=3, linewidth=0.8, color="steelblue")
-ax.scatter(residuals[np.argmax(np.abs(np.diff(np.diff(residuals)))) + 1],
-           sol_norms[np.argmax(np.abs(np.diff(np.diff(residuals)))) + 1],
-           s=80, color="crimson", zorder=5, label=f"λ = {lam_opt:.2e}")
+# Mark the corner returned by choose_lambda (recomputed at lam_opt)
+ds_opt = tikhonov_solve(J, dV_noisy, lambda_=lam_opt)
+ax.scatter(np.log10(np.linalg.norm(J @ ds_opt - dV_noisy)), np.log10(np.linalg.norm(ds_opt)),
+           s=80, color="crimson", zorder=5, label=f"corner: λ = {lam_opt:.2e}")
 ax.set_xlabel("log₁₀ ‖J δσ − δV‖")
 ax.set_ylabel("log₁₀ ‖δσ‖")
 ax.legend(fontsize=8)
