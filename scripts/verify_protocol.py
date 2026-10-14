@@ -7,17 +7,22 @@ Run with:
 
     python scripts/verify_protocol.py
 
+It runs from any directory. Use ``--outdir DIR`` to choose where the
+figure is saved (default: this scripts directory) and ``--show`` to also
+open it in a window.
+
 Produces a 2×2 figure and prints a stats table to stdout.
 """
 
 from __future__ import annotations
 
-import sys
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.ticker as ticker
 
-sys.path.insert(0, ".")
+from _cli import parse_args  # noqa: E402  (puts the repository root on sys.path)
+
+args = parse_args("Visual sanity-check for the eitkit.protocol module.")
 
 from eitkit.protocol import adjacent_pattern, measurement_pairs, add_noise
 
@@ -131,7 +136,8 @@ ax.legend(fontsize=8)
 ax.grid(True, alpha=0.3)
 
 plt.tight_layout()
-out_path = "scripts/protocol_verification.png"
+out_path = args.outdir / "protocol_verification.png"
 plt.savefig(out_path, dpi=130, bbox_inches="tight")
 print(f"Figure saved → {out_path}")
-plt.show()
+if args.show:
+    plt.show()

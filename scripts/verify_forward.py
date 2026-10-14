@@ -7,17 +7,22 @@ Run with:
 
     python scripts/verify_forward.py
 
+It runs from any directory. Use ``--outdir DIR`` to choose where the
+figure is saved (default: this scripts directory) and ``--show`` to also
+open it in a window.
+
 Produces a 2×2 figure and prints a stats table to stdout.
 """
 
 from __future__ import annotations
 
-import sys
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.tri as tri
 
-sys.path.insert(0, ".")
+from _cli import parse_args  # noqa: E402  (puts the repository root on sys.path)
+
+args = parse_args("Visual sanity-check for the eitkit.forward module.")
 
 from eitkit.mesh import make_circle_mesh, place_electrodes
 from eitkit.protocol import adjacent_pattern, measurement_pairs
@@ -134,7 +139,8 @@ ax.set_xticks(range(13))
 ax.set_yticks(range(16))
 
 plt.tight_layout()
-out_path = "scripts/forward_verification.png"
+out_path = args.outdir / "forward_verification.png"
 plt.savefig(out_path, dpi=130, bbox_inches="tight")
 print(f"Figure saved → {out_path}")
-plt.show()
+if args.show:
+    plt.show()

@@ -7,6 +7,10 @@ Run with:
 
     python scripts/verify_mesh.py
 
+It runs from any directory. Use ``--outdir DIR`` to choose where the
+figure is saved (default: this scripts directory) and ``--show`` to also
+open it in a window.
+
 Produces a 2×2 figure and prints a stats table to stdout.
 No EIT physics yet — this purely exercises mesh generation and electrode
 placement.
@@ -14,15 +18,15 @@ placement.
 
 from __future__ import annotations
 
-import sys
 import textwrap
 
 import matplotlib.pyplot as plt
 import matplotlib.tri as tri
 import numpy as np
 
-# Make sure the package is importable when run from the project root
-sys.path.insert(0, ".")
+from _cli import parse_args  # noqa: E402  (puts the repository root on sys.path)
+
+args = parse_args("Visual sanity-check for the eitkit.mesh module.")
 
 from eitkit.mesh import make_circle_mesh, place_electrodes  # noqa: E402
 
@@ -148,7 +152,8 @@ ax.legend(fontsize=9)
 ax.grid(True, axis="y", alpha=0.3)
 
 plt.tight_layout()
-out_path = "scripts/mesh_verification.png"
+out_path = args.outdir / "mesh_verification.png"
 plt.savefig(out_path, dpi=130, bbox_inches="tight")
 print(f"Figure saved → {out_path}")
-plt.show()
+if args.show:
+    plt.show()

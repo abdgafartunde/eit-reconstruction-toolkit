@@ -7,6 +7,10 @@ Run with:
 
     python scripts/verify_utils.py
 
+It runs from any directory. Use ``--outdir DIR`` to choose where the
+figure is saved (default: this scripts directory) and ``--show`` to also
+open it in a window.
+
 Panels
 ------
 A  Mesh + electrode layout
@@ -17,13 +21,14 @@ D  triangle phantom + δV comparison across all phantoms
 
 from __future__ import annotations
 
-import sys
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.patches as mpatches
 from matplotlib.transforms import Affine2D
 
-sys.path.insert(0, ".")
+from _cli import parse_args  # noqa: E402  (puts the repository root on sys.path)
+
+args = parse_args("Visual sanity-check for the eitkit.utils module.")
 
 from eitkit.mesh import make_circle_mesh, place_electrodes
 from eitkit.protocol import adjacent_pattern, measurement_pairs
@@ -170,9 +175,8 @@ plot_voltages(meas, dV_ce, n_electrodes=16, ax=axes[1, 1],
               highlight_drive=4)
 
 plt.tight_layout()
-out_path = "scripts/utils_verification.png"
+out_path = args.outdir / "utils_verification.png"
 plt.savefig(out_path, dpi=130, bbox_inches="tight")
 print(f"Figure saved → {out_path}")
-plt.show()
-
-
+if args.show:
+    plt.show()

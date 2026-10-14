@@ -2,21 +2,25 @@
 scripts/reconstruct_and_plot.py
 ===============================
 End-to-end EIT reconstruction: forward simulation, Jacobian,
-Tikhonov (L-curve), and TV (ADMM) — saves figures to ../figures/
+Tikhonov (L-curve), and TV (ADMM). Saves figures to ``figures/`` in the
+repository root, or to ``--outdir DIR``.
 
-Run: python scripts/reconstruct_and_plot.py
+Run from any directory: python scripts/reconstruct_and_plot.py
 """
 from __future__ import annotations
 
 import os
-import sys
 import numpy as np
 import matplotlib
 matplotlib.use("Agg")  # headless
 import matplotlib.pyplot as plt
 
-# Ensure eitkit is importable from the repo root
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from _cli import REPO_ROOT, parse_args  # noqa: E402  (puts the repository root on sys.path)
+
+args = parse_args(
+    "End-to-end EIT reconstruction: forward simulation, Jacobian, Tikhonov, and TV.",
+    default_outdir=REPO_ROOT / "figures",
+)
 
 from eitkit.mesh import make_circle_mesh, place_electrodes
 from eitkit.protocol import adjacent_pattern, measurement_pairs, add_noise
@@ -27,8 +31,7 @@ from eitkit.inverse import tikhonov_solve, choose_lambda, tv_solve, build_gradie
 # ---------------------------------------------------------------------------
 # Output directory (relative to repo root)
 # ---------------------------------------------------------------------------
-OUT_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "figures")
-os.makedirs(OUT_DIR, exist_ok=True)
+OUT_DIR = str(args.outdir)
 
 # ---------------------------------------------------------------------------
 # 1. Mesh & electrodes

@@ -7,6 +7,10 @@ Run with:
 
     python scripts/verify_jacobian.py
 
+It runs from any directory. Use ``--outdir DIR`` to choose where the
+figure is saved (default: this scripts directory) and ``--show`` to also
+open it in a window.
+
 Panels
 ------
 A  Sensitivity map for a single measurement — which elements matter most
@@ -17,13 +21,14 @@ D  Finite-difference validation across 20 random (meas, elem) pairs
 
 from __future__ import annotations
 
-import sys
 import time
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.tri as tri
 
-sys.path.insert(0, ".")
+from _cli import parse_args  # noqa: E402  (puts the repository root on sys.path)
+
+args = parse_args("Visual sanity-check for the eitkit Jacobian.")
 
 from eitkit.mesh import make_circle_mesh, place_electrodes
 from eitkit.protocol import adjacent_pattern, measurement_pairs
@@ -164,7 +169,8 @@ ax.legend(fontsize=9)
 ax.grid(True, alpha=0.3)
 
 plt.tight_layout()
-out_path = "scripts/jacobian_verification.png"
+out_path = args.outdir / "jacobian_verification.png"
 plt.savefig(out_path, dpi=130, bbox_inches="tight")
 print(f"Figure saved → {out_path}")
-plt.show()
+if args.show:
+    plt.show()
