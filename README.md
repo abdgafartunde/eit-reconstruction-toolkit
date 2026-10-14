@@ -100,6 +100,9 @@ phantoms, L-curve analysis, and side-by-side comparisons.
 
 ## Documentation
 
+- **[docs/eitkit-tech-note.pdf](docs/eitkit-tech-note.pdf)**: the technical
+  note. The model and algorithms as implemented, verification results,
+  parameter guidance, API reference, and limitations.
 - **[THEORY.md](THEORY.md)** — Full mathematical formulation (forward problem,
   FEM discretisation, adjoint Jacobian, Tikhonov, TV/ADMM, DistMesh2D).
 - **[examples/01_reconstruction_demo.ipynb](examples/01_reconstruction_demo.ipynb)** —

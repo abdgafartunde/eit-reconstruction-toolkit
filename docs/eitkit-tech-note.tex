@@ -1,7 +1,7 @@
 \documentclass[11pt,a4paper]{article}
 
 % ------------------------------------------------------------------ %
-%  eitkit --- Technical Note (software companion document)
+%  eitkit: technical note (software companion document)
 %  Version 0.2.0, October 2026
 % ------------------------------------------------------------------ %
 
@@ -12,39 +12,43 @@
 \usepackage{booktabs}
 \usepackage[margin=2.5cm]{geometry}
 \usepackage[numbers,sort&compress]{natbib}
+\usepackage{graphicx}
+\usepackage{algorithm}
+\usepackage{algpseudocode}
 \usepackage{hyperref}
 \usepackage{enumitem}
 \usepackage{xcolor}
 \usepackage{abstract}
+\usepackage[section]{placeins}
+\usepackage[skip=6pt]{caption}
 
+\graphicspath{{../figures/}}
 \hypersetup{
   colorlinks=true,
   linkcolor=blue!40!black,
   citecolor=blue!40!black,
   urlcolor=blue!40!black,
 }
+\setlist{nosep}
+\setlength{\emergencystretch}{3em}
 
-% ------------------------------------------------------------------ %
-%  Custom title block
-% ------------------------------------------------------------------ %
 \newcommand{\seprule}{\vspace{4pt}\noindent\rule{\textwidth}{0.5pt}\vspace{4pt}}
-
-\title{}
-\author{}
-\date{}
+\newcommand{\code}[1]{\texttt{#1}}
+\newcommand{\dsig}{\delta\sigma}
+\newcommand{\dV}{\delta V}
 
 \begin{document}
-%\maketitle  % suppressed — custom title block used instead
 
 \begin{center}
 {\LARGE\bfseries\texttt{eitkit}}\\[6pt]
 {\Large\bfseries Electrical Impedance Tomography\\[2pt]
- Reconstruction Toolkit}\\[14pt]
+ Reconstruction Toolkit}\\[10pt]
+{\large Technical note}\\[10pt]
 {\large Abd'gafar Tunde Tiamiyu}\\[4pt]
 {\small School of Mathematics, Jilin University\\[2pt]
  Changchun 130012, Jilin, China}\\[4pt]
 {\small\texttt{abdgafartunde@yahoo.com}}\\[12pt]
-{\small\bfseries Version 0.2.0 --- October 2026}\\[4pt]
+{\small\bfseries Version 0.2.0, October 2026}\\[4pt]
 {\small DOI: \texttt{10.5281/zenodo.21037312}}\\[4pt]
 \seprule
 \end{center}
@@ -52,229 +56,678 @@
 \renewcommand{\abstractname}{Summary}
 \begin{abstract}
 \noindent
-\texttt{eitkit} is an open-source Python package for 2-D difference Electrical
-Impedance Tomography (EIT).  The forward problem is solved by P1 finite elements
-with a gap electrode model, and the Jacobian is computed by the adjoint method
-with sparse LU factorisation reuse.  Inverse reconstruction employs classical
-regularisation: Tikhonov (L$^2$) with L-curve parameter selection and Total
-Variation (L$^1$) via ADMM with auto-scaled penalty.  Mesh generation uses the
-DistMesh2D algorithm of Persson \& Strang~(2004).  The toolkit requires only
-NumPy, SciPy, and Matplotlib.  Version~0.2.0 ships with a demo notebook, five
-synthetic phantom shapes, and 173~tests, including a mesh-convergence check
-against the closed-form solution on the uniform disc.
+\texttt{eitkit} is an open-source Python package for two-dimensional
+difference electrical impedance tomography (EIT) on the disc. It generates
+triangular meshes, simulates electrode voltages with piecewise-linear finite
+elements and a point (gap) electrode model, computes the Jacobian with the
+adjoint method, and reconstructs conductivity changes with Tikhonov
+regularization (with an L-curve parameter choice) and total-variation
+regularization (with ADMM). This note documents the model and every
+algorithm as implemented, maps each step to the function that performs it,
+reports the verification results (convergence to a closed-form solution,
+finite-difference and reciprocity checks, golden-output tests), gives
+practical guidance on choosing the mesh size and the regularization
+parameters, and states the limitations. A step-by-step tutorial is provided
+separately as \code{examples/00\_getting\_started.ipynb}.
 \end{abstract}
 
-% ------------------------------------------------------------------ %
-\section{Overview}
+\tableofcontents
 
-\textbf{Electrical Impedance Tomography (EIT)} reconstructs the interior
-conductivity distribution $\sigma(x)$ of a domain $\Omega\subset\mathbb{R}^2$
-from boundary voltage measurements. The mathematical problem, posed by
-Calder\'on~\cite{Calderon1980}, is severely ill-posed: small perturbations in
-boundary data can induce arbitrarily large errors in any
-reconstruction~\citep{Mandache2001}.
+% ================================================================== %
+\section{Introduction}
+% ================================================================== %
 
-\texttt{eitkit} implements the complete \textbf{difference EIT} pipeline:
+Electrical impedance tomography recovers the conductivity $\sigma$ inside a
+body from voltages measured on its boundary while currents are injected
+through electrodes. The inverse problem is severely ill-posed: in the worst
+case the conductivity depends on the boundary data only
+logarithmically~\cite{Mandache2001}, and reconstructions must be stabilized
+by regularization~\cite{Borcea2002,CheneyIsaacsonNewell1999}.
+\emph{Difference} EIT avoids the need for an accurate absolute model by
+imaging the change between two states, for example two breathing phases,
+from the change in the measured voltages.
 
-\begin{center}
-\begin{tabular}{@{}ll@{}}
+\texttt{eitkit} implements the standard linearized difference-imaging
+pipeline for a circular domain:
+\begin{enumerate}
+  \item generate a mesh of the disc with electrodes at prescribed angles
+        (\code{eitkit.mesh});
+  \item choose the drive and measurement protocol (\code{eitkit.protocol});
+  \item simulate difference voltages and compute the Jacobian
+        (\code{eitkit.forward});
+  \item reconstruct the conductivity change with Tikhonov or total-variation
+        regularization (\code{eitkit.inverse});
+  \item build phantoms and plot results (\code{eitkit.utils}).
+\end{enumerate}
+It is intended for teaching, for prototyping reconstruction methods, and as a
+small, readable reference implementation: it depends only on NumPy, SciPy,
+and Matplotlib. It is not a replacement for full-featured packages such as
+EIDORS~\cite{AdlerLionheart2006}; Section~\ref{sec:limitations} lists what it
+does not do.
+
+\paragraph{Installation.} From the repository root,
+\code{pip install -e ".[dev]"} installs the package with the test and
+notebook dependencies; \code{uv sync --extra dev} reproduces the exact
+environment recorded in \code{uv.lock}. The tutorial notebook
+\code{examples/00\_getting\_started.ipynb} walks through a complete
+experiment and is executed by continuous integration on every change.
+
+% ================================================================== %
+\section{The forward problem}
+% ================================================================== %
+
+\subsection{Governing equation}
+
+Let $\Omega$ be the disc of radius $R$ (the unit disc by default) and
+$\sigma\in L^\infty(\Omega)$ the conductivity, bounded below by a positive
+constant. In the absence of interior sources the electric potential $u$
+satisfies
+\begin{equation}\label{eq:pde}
+  -\nabla\cdot(\sigma\nabla u) = 0 \quad\text{in } \Omega .
+\end{equation}
+Current $I$ is injected at electrode $e^+$ and extracted at electrode $e^-$.
+The potential is determined up to an additive constant; measured voltages are
+differences of potentials, so the constant does not matter.
+
+\subsection{Point (gap) electrode model}
+
+\texttt{eitkit} models each electrode as a single boundary point $x_\ell$.
+The boundary condition is
+\begin{equation}\label{eq:gap}
+  \sigma\,\frac{\partial u}{\partial n} = I\,\bigl(\delta_{x_{e^+}} -
+  \delta_{x_{e^-}}\bigr) \quad\text{on } \partial\Omega ,
+\end{equation}
+and a voltage measurement between electrodes $a$ and $b$ is
+$V = u(x_a) - u(x_b)$. This is the simplest electrode model. It ignores the
+electrode width and the contact impedance, which the complete electrode
+model~\cite{SomersaloCheneyIsaacson1992} includes. Near a point source the
+potential has a logarithmic singularity, so the voltage at a driven electrode
+is not defined by~\eqref{eq:gap}; the measurement protocol
+(Section~\ref{sec:protocol}) therefore never uses a driven electrode.
+
+For the uniform unit disc ($\sigma\equiv1$, $R=1$) the solution is known in
+closed form,
+\begin{equation}\label{eq:exact}
+  u(x) = -\frac{I}{\pi}\Bigl(\ln|x-x_{e^+}| - \ln|x-x_{e^-}|\Bigr) + C ,
+\end{equation}
+because $\partial_n\ln|x-y| = \tfrac12$ on the unit circle for every
+boundary point $x\neq y$, so the normal flux vanishes away from the
+electrodes. Section~\ref{sec:verification} uses~\eqref{eq:exact} to verify
+the solver.
+
+\subsection{Mesh generation}
+
+\code{make\_circle\_mesh(n\_electrodes, h0, radius, max\_iter, seed)} builds
+a triangulation with target edge length $h_0$ by a node-relaxation method in
+the spirit of DistMesh~\cite{PerssonStrang2004}:
+\begin{enumerate}
+  \item \emph{Boundary nodes.} $N_b = L\,\lceil 2\pi R/(L h_0)\rceil$ nodes
+        are placed on the circle at equal angles, where $L$ is the number of
+        electrodes. Boundary edges are therefore no longer than $h_0$, and
+        because $N_b$ is a multiple of $L$, every electrode angle
+        $2\pi\ell/L$ is a boundary node. These nodes never move.
+  \item \emph{Interior seed.} A hexagonal grid with spacing $h_0$ fills the
+        disc; seeds closer than $0.6\,h_0$ to a boundary node are removed and
+        the rest are jittered slightly (seeded by \code{seed}) to break
+        Delaunay degeneracies.
+  \item \emph{Relaxation.} Interior nodes are moved by repulsive edge forces
+        $\max(h_0-\ell,0)$ for up to \code{max\_iter} iterations, with a
+        Delaunay retriangulation at each step; a node that leaves the disc is
+        projected back onto the circle.
+  \item \emph{Clean-up.} Triangles whose centroids lie outside the disc are
+        removed, all triangles are oriented counterclockwise, and the boundary
+        nodes are sorted by angle.
+\end{enumerate}
+\code{place\_electrodes(mesh, n\_electrodes, start\_angle)} returns, for each
+electrode, the boundary node closest in angle to
+$\theta_\ell = \code{start\_angle} + 2\pi\ell/L$; with the default
+\code{start\_angle = 0} this is exactly the node placed in step~1. Electrode
+$0$ lies on the positive $x$-axis and the numbering runs counterclockwise.
+
+Table~\ref{tab:mesh} lists the resulting mesh sizes. Version~0.2.0 fixed a
+defect in earlier versions, in which only the electrode nodes were placed on
+the boundary: the boundary was then resolved by about 26 nodes regardless of
+$h_0$, the polygonal domain did not converge to the disc, and the electrode
+voltages did not converge under refinement.
+
+\begin{table}[ht]
+\centering
+\caption{Meshes from \code{make\_circle\_mesh} with $L=16$ and
+\code{seed = 42}. The area ratio measures how well the polygon approximates
+the disc.}
+\label{tab:mesh}
+\begin{tabular}{rrrrc}
 \toprule
-Stage          & Implementation \\
+$h_0$ & nodes & triangles & boundary nodes & area$/\pi$ \\
 \midrule
-Mesh generation  & DistMesh2D triangular mesh on the unit disc \\
-Forward problem  & P1-FEM with gap electrode model \\
-Jacobian         & Adjoint method with sparse LU factorisation reuse \\
-Inverse problem  & Tikhonov (L$^2$) + L-curve and TV (L$^1$) via ADMM \\
+0.20  &  107 &   180 &  32 & 0.99359 \\
+0.10  &  389 &   712 &  64 & 0.99839 \\
+0.08  &  604 &  1126 &  80 & 0.99897 \\
+0.05  & 1510 &  2890 & 128 & 0.99960 \\
+0.025 & 5907 & 11556 & 256 & 0.99990 \\
 \bottomrule
 \end{tabular}
-\end{center}
+\end{table}
 
-% ------------------------------------------------------------------ %
-\section{Forward Problem}
+\subsection{Finite element discretization}
 
-\subsection{Governing Equation}
-
-Let $\Omega\subset\mathbb{R}^2$ be a bounded Lipschitz domain. Given a
-conductivity $\sigma\in L^\infty(\Omega)$ with $\sigma(x)\ge c>0$, the electric
-potential $u\in H^1(\Omega)$ satisfies
-\begin{align}
--\nabla\cdot(\sigma\nabla u) &= 0      \quad\text{in }\Omega,
-\label{eq:pde}\\[4pt]
-\sigma\frac{\partial u}{\partial n} &= j \quad\text{on }\partial\Omega,
-\label{eq:bc}
-\end{align}
-where $j$ is the applied current density with
-$\int_{\partial\Omega}j\,ds=0$. A ground condition $u(x_0)=0$ at one
-interior node ensures uniqueness.
-
-\subsection{Gap Electrode Model}
-
-Each of the $L$ electrodes is modelled as a single boundary node.
-A stimulation pair $(e^+,e^-)$ injects current $+I$ at electrode $e^+$ and
-extracts $-I$ at $e^-$. The Neumann load vector $f\in\mathbb{R}^N$ has entries
-\[
-f_i = \begin{cases}
-+I & \text{node $i$ is electrode $e^+$},\\[2pt]
--I & \text{node $i$ is electrode $e^-$},\\[2pt]
-0  & \text{otherwise}.
-\end{cases}
-\]
-
-\subsection{P1 Finite Element Discretisation}
-
-The domain is triangulated with $M$ linear elements on $N$ nodes.
-Writing $u=\sum_{i=1}^N u_i\varphi_i$ with P1 hat functions
-$\varphi_i$, the weak form yields
-\begin{equation}
-K(\sigma)\,u = f,
-\label{eq:Ksystem}
+The potential is approximated by continuous piecewise-linear (P1) functions
+on the mesh, and $\sigma$ is constant on each triangle. For a triangle $T_e$
+with vertices $(x_i,y_i)$, $i=1,2,3$, area $A_e$, and conductivity
+$\sigma_e$, the gradient coefficients are
+$b_i = y_j - y_k$ and $c_i = x_k - x_j$ for the cyclic permutations
+$(i,j,k)$, and the element stiffness matrix is
+\begin{equation}\label{eq:element}
+  K^{(e)} = \frac{\sigma_e}{4A_e}\bigl(\mathbf b\mathbf b^\top +
+  \mathbf c\mathbf c^\top\bigr) \in\mathbb R^{3\times3} .
 \end{equation}
-where the global stiffness matrix is assembled element-wise:
-\[
-K = \sum_{e=1}^{M} K^e, \qquad
-K^e_{ij} = \frac{\sigma_e}{4A_e}(b_i b_j + c_i c_j), \quad i,j\in\{0,1,2\}.
-\]
-The gradient coefficients are $b_i=y_{i+1}-y_{i+2}$,
-$c_i=x_{i+2}-x_{i+1}$ (indices mod~3), and $A_e$ is the element area.
-Assembly is vectorised over elements using NumPy advanced indexing, producing a
-\texttt{csr\_array} for efficient sparse arithmetic.
+\code{assemble\_K(mesh, sigma)} sums these into the sparse global matrix $K$.
+The boundary condition~\eqref{eq:gap} becomes the load vector $f$ with
+$f_{e^+}=+I$, $f_{e^-}=-I$ at the electrode nodes and zeros elsewhere
+(\code{build\_load\_vector}). $K$ is singular, with the constants in its
+kernel; the interior node nearest the centre is grounded ($u=0$) by
+symmetric row and column elimination (\code{pick\_ground\_node},
+\code{apply\_dirichlet\_bc}). In \code{simulate} and \code{compute\_jacobian}
+the modified matrix is factorized once with a sparse LU decomposition
+(\code{scipy.sparse.linalg.splu}) and reused for every right-hand side.
 
-\subsection{Measurement Protocol}
+\subsection{Measurement protocol}\label{sec:protocol}
 
-The standard \textbf{adjacent drive / adjacent measurement} protocol is used.
-For $L$ electrodes there are $L$ drive steps; step~$k$ sources current at
-electrode~$k$ and sinks at $(k+1)\bmod L$. Per drive step, $L-3$ voltage
-measurements are taken across adjacent electrode pairs $(k+2,k+3),\dots,(k+L-2,k+L-1)$
-(all indices modulo~$L$). The total number of measurements is $P=L(L-3)$; for
-$L=16$ this gives $P=208$.
+\code{adjacent\_pattern(L)} returns the $L$ drive pairs $(k, k+1 \bmod L)$.
+\code{measurement\_pairs(L)} returns, for each drive step $k$, the $L-3$
+adjacent pairs $(m, m+1 \bmod L)$ that contain neither driven electrode, as
+rows \code{[k, m, m+1]}. With $L=16$ there are $16\times13=208$ measurements.
+By reciprocity, the voltage for drive pair $(a,b)$ and measurement pair
+$(c,d)$ equals the voltage for drive $(c,d)$ and measurement $(a,b)$, so only
+$L(L-3)/2 = 104$ measurements are independent. The Jacobian accordingly has
+rank 104 (Section~\ref{sec:verification}).
 
-\subsection{Difference EIT and the Jacobian}
+% ================================================================== %
+\section{Difference imaging and the Jacobian}
+% ================================================================== %
 
-Absolute voltages are difficult to calibrate experimentally. Difference EIT
-measures voltage changes relative to a reference state $\sigma_0$:
-$\delta V = V(\sigma)-V(\sigma_0)$. Linearising around $\sigma_0$ gives the
-Born approximation
+\subsection{Linearization}
+
+For a reference conductivity $\sigma_0$ (by default the constant
+\code{sigma0 = 1}), \code{simulate} returns the difference voltages
 \begin{equation}
-\delta V \approx J(\sigma_0)\,\delta\sigma,
-\label{eq:born}
+  \dV = V(\sigma) - V(\sigma_0) \in\mathbb R^{P},
 \end{equation}
-where $J\in\mathbb{R}^{P\times M}$ is the Jacobian and
-$\delta\sigma=\sigma-\sigma_0\in\mathbb{R}^M$ is the conductivity perturbation.
+one entry per row of \code{meas\_pairs}. The reconstruction methods use the
+linear model
+\begin{equation}\label{eq:linear}
+  \dV \approx J\,\dsig, \qquad \dsig = \sigma-\sigma_0 ,\qquad
+  J_{ie} = \frac{\partial V_i}{\partial\sigma_e}\Big|_{\sigma_0} ,
+\end{equation}
+with one row per measurement and one column per triangle. The relative
+linearization error $\|J\dsig-\dV\|/\|\dV\|$ measures how far the data are
+from this model; for the two-inclusion phantom of
+Section~\ref{sec:example}, with contrasts 1.6 and 0.5 against a background of
+1, it is $0.27$.
 
-The Jacobian is computed by the \textbf{adjoint method}. For measurement~$i$
-associated with drive step~$k$ and electrode pair $(e^+,e^-)$,
+\subsection{The adjoint formula}
+
+Let $u_k$ be the potential for drive step $k$ and $\phi_i$ the potential
+generated by a unit current entering at the plus-electrode and leaving at the
+minus-electrode of measurement $i$. Then~\cite{Geselowitz1971}
+\begin{equation}\label{eq:sensitivity}
+  J_{ie} = -\int_{T_e}\nabla u_k\cdot\nabla\phi_i\,dx ,
+\end{equation}
+which for P1 elements reduces to
 \begin{equation}
-J_{ie} = -\int_{\Omega_e} \nabla u_k\cdot\nabla\phi_i\,d\Omega,
-\label{eq:adjoint}
+  J_{ie} = -\frac{1}{4A_e}\Bigl[(\mathbf b\cdot\mathbf u_k^e)
+  (\mathbf b\cdot\boldsymbol\phi_i^e) + (\mathbf c\cdot\mathbf u_k^e)
+  (\mathbf c\cdot\boldsymbol\phi_i^e)\Bigr],
 \end{equation}
-where $u_k$ is the forward potential for drive step~$k$ and $\phi_i$ is the
-adjoint potential (unit current injected at $e^+$, extracted at $e^-$).
-For the adjacent protocol, at most $L$ adjoint solves are needed, and the
-factorised stiffness matrix is reused for all solves via
-\texttt{scipy.sparse.linalg.splu}.
+where $\mathbf u_k^e$ and $\boldsymbol\phi_i^e$ are the nodal values on the
+three vertices of $T_e$. The adjacent protocol uses at most $L$ distinct
+measurement pairs, so \code{compute\_jacobian} needs $L$ forward and at most
+$L$ adjoint solves, all with a single sparse factorization, rather than one
+adjoint solve per measurement; it assembles $J$ in a few milliseconds
+(Table~\ref{tab:timing}).
 
-% ------------------------------------------------------------------ %
-\section{Inverse Problem}
+\subsection{What the Jacobian tells you}
 
-\subsection{Tikhonov Regularisation (L$^2$)}
+The singular values of $J$ decay quickly: at $h_0 = 0.08$ the 104 nonzero
+singular values span about $5\times10^{5}$. The column norms of $J$ per unit
+area measure the sensitivity of the data to each region; they fall by more
+than an order of magnitude from the electrodes to the centre, which is why
+EIT reconstructions are least resolved in the middle of the domain (see the
+sensitivity map in the tutorial).
 
-The Tikhonov solution minimises
-\begin{equation}
-\delta\hat\sigma =
-\arg\min_{\delta\sigma}\Bigl\{
-\tfrac12\|J\delta\sigma-\delta V\|_2^2
-+ \lambda\|\delta\sigma\|_2^2
-\Bigr\},
-\label{eq:tikhonov}
+% ================================================================== %
+\section{Reconstruction}
+% ================================================================== %
+
+\subsection{Tikhonov regularization}
+
+\code{tikhonov\_solve(J, dV, lambda\_, solver)} computes
+\begin{equation}\label{eq:tikhonov}
+  \dsig_\lambda = \arg\min_{\dsig}\ \|J\dsig-\dV\|^2 + \lambda\|\dsig\|^2
+  = (J^\top J + \lambda I)^{-1}J^\top\dV .
 \end{equation}
-with closed-form solution $\delta\hat\sigma=(J^T J+\lambda I)^{-1}J^T\delta V$.
-The regularisation parameter $\lambda$ is chosen automatically via the L-curve
-method~\citep{Hansen1992}: the optimal $\lambda$ corresponds to the point of
-maximum curvature on the log-log plot of residual norm against solution norm.
+The default \code{solver="direct"} solves the $E\times E$ normal equations
+with \code{numpy.linalg.solve}; \code{solver="lsqr"} applies LSQR to the
+equivalent augmented least-squares system, which avoids forming
+$J^\top J$.
 
-\subsection{Total Variation (L$^1$ / ADMM)}
+\subsection{Choosing $\lambda$: the L-curve}
 
-TV regularisation promotes piecewise-constant reconstructions:
-\begin{equation}
-\delta\hat\sigma =
-\arg\min_{\delta\sigma}\Bigl\{
-\tfrac12\|J\delta\sigma-\delta V\|_2^2
-+ \alpha\|D\delta\sigma\|_1
-\Bigr\},
-\label{eq:tv}
+\code{choose\_lambda(J, dV, lambdas, n\_points, solver)} evaluates
+$x(\lambda)=\log_{10}\|J\dsig_\lambda-\dV\|$ and
+$y(\lambda)=\log_{10}\|\dsig_\lambda\|$ for candidate values (by default 50
+values log-spaced between $10^{-6}s$ and $10^{2}s$ with
+$s=\|J\|_F^2/P$) and returns the point of maximum signed
+curvature~\cite{Hansen1992,HansenOLeary1993}
+\begin{equation}\label{eq:curvature}
+  \kappa = \frac{x'y''-y'x''}{(x'^2+y'^2)^{3/2}},
 \end{equation}
-where $D\in\mathbb{R}^{F\times M}$ is a sparse finite-difference operator on
-element-to-element edges. The problem is solved by the Alternating Direction
-Method of Multipliers (ADMM)~\citep{Boyd2011} with splitting $z=D\delta\sigma$.
-The $\sigma$-update is a quadratic system solved by direct factorisation, the
-$z$-update is element-wise soft-thresholding, and the penalty parameter $\rho$
-is auto-scaled as $\rho=\operatorname{tr}(J^T J)/\operatorname{tr}(D^T D)$.
+with derivatives taken with respect to $t=\log_{10}\lambda$ by finite
+differences, along increasing $\lambda$. It also returns $x$ and $y$ for
+plotting.
 
-% ------------------------------------------------------------------ %
-\section{Package Structure and Availability}
+Version~0.2.0 corrected this computation: earlier versions omitted the
+denominator of~\eqref{eq:curvature}, which made the selected $\lambda$
+insensitive to the noise level (the same value at 30, 45, and 60\,dB) and
+placed it on the over-smoothing branch of the curve.
 
-\begin{center}
-\begin{tabular}{@{}ll@{}}
+The L-curve is a heuristic. In the example of Section~\ref{sec:example} it
+selects $\lambda = 2.3\times10^{-9}$ (relative error 0.69), against an
+error of 0.58 for the best $\lambda$, which can only be found when the truth
+is known. The \emph{discrepancy principle}~\cite{Morozov1966}, which chooses
+$\lambda$ so that the residual matches the noise level, is unreliable in
+linearized difference EIT: the residual is dominated by the linearization
+error (27\% of $\|\dV\|$ in the example) rather than by the noise (0.6\% at
+45\,dB), so it must be applied with an estimate of the total misfit.
+
+\subsection{Total-variation regularization}
+
+\code{tv\_solve(J, dV, alpha, mesh, rho, max\_iter, tol, warm\_start)}
+computes
+\begin{equation}\label{eq:tv}
+  \dsig_\alpha = \arg\min_{\dsig}\ \tfrac12\|J\dsig-\dV\|^2 +
+  \alpha\|D\dsig\|_1 ,
+\end{equation}
+where $D$ (\code{build\_gradient\_op}) has one row per interior edge of the
+mesh and two nonzero entries, $+1$ and $-1$, for the two triangles that share
+that edge. Thus $\|D\dsig\|_1$ is the sum of the absolute jumps of $\dsig$
+across interior edges. Total variation~\cite{RudinOsherFatemi1992} weights
+each jump by the length of its edge; $D$ does not, so on a quasi-uniform mesh
+$\|D\dsig\|_1$ approximates $\mathrm{TV}(\dsig)/\bar h$ for a typical edge
+length $\bar h$, and the appropriate $\alpha$ changes with $h_0$.
+
+Problem~\eqref{eq:tv} is solved by ADMM~\cite{Boyd2011} with the splitting
+$z = D\dsig$ (Algorithm~\ref{alg:admm}). The $\dsig$-update matrix
+$H = J^\top J+\rho D^\top D$ is symmetric positive definite and is factorized
+once, so each iteration costs one pair of triangular solves and a few sparse
+products. With \code{rho="auto"} the penalty is
+$\rho = \operatorname{tr}(J^\top J)/\operatorname{tr}(D^\top D)$, which
+balances the two terms of $H$.
+
+\begin{algorithm}[ht]
+\caption{ADMM for TV-regularized difference EIT (\code{tv\_solve})}
+\label{alg:admm}
+\begin{algorithmic}[1]
+\Require $J$, $\dV$, $\alpha>0$, $\rho>0$, tolerance $\varepsilon$, starting
+point $\dsig^0$ (zero, or \code{warm\_start})
+\State factorize $H = J^\top J + \rho D^\top D$; set $z^0=u^0=0$,
+$\kappa = \alpha/\rho$
+\For{$k = 0,1,\dots,\code{max\_iter}-1$}
+  \State $\dsig^{k+1} = H^{-1}\bigl(J^\top\dV + \rho D^\top(z^k-u^k)\bigr)$
+  \State $z^{k+1} = \mathcal S_\kappa\bigl(D\dsig^{k+1}+u^k\bigr)$
+  \Comment{$\mathcal S_\kappa(v) = \operatorname{sign}(v)\max(|v|-\kappa,0)$}
+  \State $u^{k+1} = u^k + D\dsig^{k+1} - z^{k+1}$
+  \If{$\|D\dsig^{k+1}-z^{k+1}\| \le \varepsilon\max\bigl(\|D\dsig^{k+1}\|,
+  \|z^{k+1}\|, 1\bigr)$} \textbf{stop} \EndIf
+\EndFor
+\State \Return $\dsig^{k+1}$
+\end{algorithmic}
+\end{algorithm}
+
+% ================================================================== %
+\section{Verification}\label{sec:verification}
+% ================================================================== %
+
+\subsection{Convergence to the exact solution}
+
+\code{scripts/verify\_convergence.py} compares the FEM electrode voltages with
+the closed form~\eqref{eq:exact} on the uniform unit disc, for every drive
+step of the adjacent protocol and all 13 measurements per step, on meshes
+with $h_0$ from 0.2 to 0.025. Table~\ref{tab:convergence} and
+Figure~\ref{fig:convergence} show the mean relative error. It decreases at
+every level, at a rate close to two; the meshes are not nested, so the
+observed rate varies between levels. Before the mesh fix of
+version~0.2.0 the same study gave errors of 0.25, 0.10, and 0.027 at
+$h_0=0.1$, $0.05$, and $0.025$, without monotone decrease.
+
+\begin{table}[ht]
+\centering
+\caption{Mean relative error of the FEM electrode voltages against the exact
+solution~\eqref{eq:exact}, and the observed rate between consecutive meshes.}
+\label{tab:convergence}
+\begin{tabular}{rrrcc}
 \toprule
-Module & Contents \\
+$h_0$ & nodes & boundary nodes & relative error & rate \\
 \midrule
-\texttt{eitkit.mesh}    & DistMesh2D mesh generation, electrode placement \\
-\texttt{eitkit.forward} & P1 FEM assembly, gap electrode model, adjoint Jacobian \\
-\texttt{eitkit.protocol}& Adjacent drive and measurement patterns, AWGN noise \\
-\texttt{eitkit.inverse} & Tikhonov (L$^2$) + L-curve, TV-ADMM (L$^1$) \\
-\texttt{eitkit.utils}   & Five phantom shapes, publication-quality visualisation \\
+0.200 &  107 &  32 & $6.64\times10^{-2}$ & --   \\
+0.140 &  205 &  48 & $2.94\times10^{-2}$ & 2.29 \\
+0.100 &  389 &  64 & $8.89\times10^{-3}$ & 3.55 \\
+0.070 &  787 &  96 & $3.62\times10^{-3}$ & 2.52 \\
+0.050 & 1510 & 128 & $1.52\times10^{-3}$ & 2.59 \\
+0.035 & 3051 & 192 & $5.68\times10^{-4}$ & 2.75 \\
+0.025 & 5907 & 256 & $4.16\times10^{-4}$ & 0.92 \\
 \bottomrule
 \end{tabular}
-\end{center}
+\end{table}
 
-Installation from source:
-\begin{verbatim}
-git clone https://github.com/abdgafartunde/eit-reconstruction-toolkit
-cd eit-reconstruction-toolkit
-pip install -e ".[dev]"
-\end{verbatim}
+\begin{figure}[ht]
+\centering
+\includegraphics[width=0.62\textwidth]{convergence_verification.png}
+\caption{Convergence of the forward model (Table~\ref{tab:convergence}),
+with an $O(h_0^2)$ reference line.}
+\label{fig:convergence}
+\end{figure}
 
-The core dependency stack is NumPy $\ge$\,1.24, SciPy $\ge$\,1.10, and
-Matplotlib $\ge$\,3.7.  A complete interactive example is provided in
-\texttt{examples/01\_reconstruction\_demo.ipynb}.
+\subsection{Jacobian and reciprocity}
 
-% ------------------------------------------------------------------ %
-\section{References}
+\begin{itemize}
+  \item \emph{Finite differences.} \code{scripts/verify\_jacobian.py}
+        compares 20 entries of the adjoint Jacobian with central finite
+        differences of \code{simulate}; the largest relative difference is
+        $2.4\times10^{-7}$.
+  \item \emph{Reciprocity.} Swapping drive and measurement pairs changes the
+        computed voltage by at most $1.3\times10^{-15}$ (relative) on an
+        inhomogeneous conductivity, as the symmetry of $K$ requires.
+  \item \emph{Rank.} $J$ has numerical rank $104 = L(L-3)/2$ at $h_0 = 0.1$,
+        $0.08$, and $0.05$, as reciprocity predicts.
+\end{itemize}
 
-\begin{thebibliography}{10}
+\subsection{Automated tests}
 
-\bibitem{Calderon1980}
-A.P.~Calder\'on.
-\newblock On an inverse boundary value problem.
-\newblock In \emph{Seminar on Numerical Analysis and its Applications to
-  Continuum Physics}, Rio de Janeiro, 1980.
+The test suite (177 tests, \code{pytest}) checks mesh validity and quality,
+the protocol, the forward solver and Jacobian, both reconstruction methods,
+the L-curve corner (including its dependence on the noise level), the
+phantoms and plotting helpers, boundary resolution and forward convergence
+against~\eqref{eq:exact}, and a golden-output test that reruns the demo
+notebook's pipeline and compares mesh counts, voltages, and reconstruction
+errors with stored values (\code{tests/golden/demo\_notebook.json}).
+Continuous integration runs the suite on Python 3.10 to 3.13, runs every
+script from outside the repository, and executes both notebooks.
 
-\bibitem{Mandache2001}
-N.~Mandache.
-\newblock Exponential instability in an inverse problem for the Schr\"odinger
-  equation.
-\newblock \emph{Inverse Problems}, 17(5):1435--1444, 2001.
+% ================================================================== %
+\section{Numerical example}\label{sec:example}
+% ================================================================== %
 
-\bibitem{PerssonStrang2004}
-P.-O.~Persson and G.~Strang.
-\newblock A simple mesh generator in MATLAB.
-\newblock \emph{SIAM Review}, 46(2):329--345, 2004.
+The example in \code{scripts/reconstruct\_and\_plot.py}, the demo notebook,
+and the tutorial uses $L=16$ electrodes, $h_0=0.08$ (604 nodes, 1126
+triangles), unit current, a background conductivity of 1\,S/m with a disc of
+1.6\,S/m and an ellipse of 0.5\,S/m (Figure~\ref{fig:setup}), and white
+Gaussian noise at 45\,dB SNR. The difference voltages are shown in
+Figure~\ref{fig:voltages}, the L-curve in Figure~\ref{fig:lcurve}, and the
+reconstructions in Figure~\ref{fig:reconstructions}.
+
+\begin{figure}[ht]
+\centering
+\includegraphics[width=0.85\textwidth]{01_mesh_and_phantom.png}
+\caption{Mesh with the 16 electrodes, and the true conductivity.}
+\label{fig:setup}
+\end{figure}
+
+\begin{figure}[ht]
+\centering
+\includegraphics[width=0.85\textwidth]{02_voltage_data.png}
+\caption{Clean and noisy difference voltages, arranged by drive step and
+measurement pair.}
+\label{fig:voltages}
+\end{figure}
+
+\begin{figure}[ht]
+\centering
+\includegraphics[width=0.48\textwidth]{03_lcurve.png}
+\caption{L-curve and the corner returned by \code{choose\_lambda}.}
+\label{fig:lcurve}
+\end{figure}
+
+\begin{figure}[ht]
+\centering
+\includegraphics[width=\textwidth]{04_reconstructions.png}
+\caption{True conductivity, Tikhonov reconstruction ($\lambda=10^{-7}$), and
+TV reconstruction ($\alpha=5\times10^{-8}$).}
+\label{fig:reconstructions}
+\end{figure}
+
+Table~\ref{tab:errors} lists the relative errors
+$\|\dsig-\dsig_{\text{true}}\|/\|\dsig_{\text{true}}\|$. TV recovers both
+inclusions with sharp boundaries and a flat background; both methods
+underestimate the contrast, because a single linearized step cannot reach
+the full contrast and the regularization pulls the solution towards zero. To
+avoid the \emph{inverse crime}~\cite{KaipioSomersalo2007}, the last column
+uses data simulated on a finer mesh ($h_0=0.04$, 4506 triangles) and
+reconstructed on the $h_0=0.08$ mesh. The errors hardly change: since the
+mesh fix, the discretization error at $h_0=0.08$ (below 1\% in the voltages)
+is small compared with the linearization and regularization errors.
+
+\begin{table}[ht]
+\centering
+\caption{Relative reconstruction errors for the example (45\,dB SNR).}
+\label{tab:errors}
+\begin{tabular}{lcc}
+\toprule
+method & same-mesh data & fine-mesh data \\
+\midrule
+Tikhonov, $\lambda = 10^{-7}$ (fixed)            & 0.579 & -- \\
+Tikhonov, $\lambda = 6.3\times10^{-8}$ (best)     & 0.575 & -- \\
+Tikhonov, $\lambda = 2.3\times10^{-9}$ (L-curve)  & 0.689 & 0.659 \\
+TV, $\alpha = 5\times10^{-8}$                     & 0.426 & 0.419 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{table}[ht]
+\centering
+\caption{Wall-clock times (Apple M-series laptop, Python 3.13) for a
+single-disc phantom; TV uses 300 iterations.}
+\label{tab:timing}
+\begin{tabular}{rrcccc}
+\toprule
+$h_0$ & triangles & mesh & \code{simulate} + \code{compute\_jacobian} &
+Tikhonov & TV \\
+\midrule
+0.10 &  712 & 0.48\,s & 0.006\,s & 0.003\,s & 0.07\,s \\
+0.08 & 1126 & 0.82\,s & 0.006\,s & 0.008\,s & 0.16\,s \\
+0.05 & 2890 & 2.31\,s & 0.016\,s & 0.083\,s & 1.22\,s \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+% ================================================================== %
+\section{Choosing the parameters}\label{sec:parameters}
+% ================================================================== %
+
+\paragraph{Mesh size $h_0$.} The forward error is about 0.9\% at $h_0=0.1$
+and 0.15\% at $h_0=0.05$ (Table~\ref{tab:convergence}), which is well below
+the noise and linearization errors of typical experiments. The number of
+triangles $E$ grows like $h_0^{-2}$; the Jacobian costs $O(PE)$ memory and the
+direct Tikhonov solve up to $O(E^3)$ operations, so $h_0$ between 0.05 and
+0.1 is a good default. For honest tests, simulate data on a finer mesh than
+the one used for reconstruction.
+
+\paragraph{Tikhonov parameter $\lambda$.} The scale of $\lambda$ follows the
+scale of $J^\top J$, which depends on the current, the domain, and the mesh.
+Start from the L-curve corner, plot the reconstruction for $\lambda$ ten
+times smaller and larger, and prefer the largest $\lambda$ that keeps the
+features you expect. For the example ($I=1$, unit disc, $h_0=0.08$), good
+values lie between $10^{-9}$ and $10^{-7}$.
+
+\paragraph{TV parameter $\alpha$.} In the example, $\alpha$ between
+$5\times10^{-8}$ and $10^{-7}$ gives the smallest errors (0.426 and 0.418);
+$\alpha=10^{-8}$ and $2\times10^{-7}$ give 0.458 and 0.452. Because $D$ is
+not weighted by edge length, retune $\alpha$ when you change $h_0$. ADMM
+usually converges within a few hundred iterations; increase
+\code{max\_iter} or decrease \code{tol} if the result changes between runs
+with more iterations, and use \code{warm\_start} when sweeping $\alpha$.
+
+\paragraph{Noise and contrast.} \code{add\_noise(dV, snr\_db, rng)} adds
+white Gaussian noise at a prescribed SNR over the whole vector. Real systems
+also have systematic errors (electrode positions, contact impedance) that the
+model does not include; treat the SNR as an upper bound on data quality.
+Large contrasts increase the linearization error and make the reconstructed
+contrast too small.
+
+% ================================================================== %
+\section{Software reference}
+% ================================================================== %
+
+\paragraph{Conventions.} Conductivities are per triangle, in S/m; currents
+in A; voltages in V; lengths in units of the radius. Arrays are NumPy
+arrays: \code{sigma} has shape $(E,)$, \code{drive\_pairs} $(L,2)$,
+\code{meas\_pairs} $(P,3)$ with columns [drive step, plus electrode, minus
+electrode], \code{dV} $(P,)$, and $J$ $(P,E)$. Electrode 0 is at angle
+\code{start\_angle} (default 0) and the numbering is counterclockwise.
+
+\begin{table}[ht]
+\centering
+\small
+\caption{Public functions (module prefixes relative to \code{eitkit}).}
+\label{tab:api}
+\begin{tabular}{@{}p{0.47\textwidth}p{0.48\textwidth}@{}}
+\toprule
+function & purpose \\
+\midrule
+\code{mesh.make\_circle\_mesh(n\_electrodes, h0, radius, max\_iter, seed)}
+  & triangular mesh of the disc (\code{Mesh}) \\
+\code{mesh.place\_electrodes(mesh, n\_electrodes, start\_angle)}
+  & electrode nodes (\code{ElectrodeConfig}) \\
+\code{protocol.adjacent\_pattern(L)} & drive pairs \\
+\code{protocol.measurement\_pairs(L)} & measurement schedule \\
+\code{protocol.add\_noise(voltages, snr\_db, rng)} & white Gaussian noise \\
+\code{forward.assemble\_K(mesh, sigma)} & global stiffness matrix \\
+\code{forward.simulate(mesh, ec, sigma, drive, meas, current, sigma0)}
+  & difference voltages $\dV$ \\
+\code{forward.compute\_jacobian(mesh, ec, sigma, drive, meas, current)}
+  & Jacobian $J$ (adjoint method) \\
+\code{inverse.tikhonov\_solve(J, dV, lambda\_, solver)}
+  & Tikhonov reconstruction~\eqref{eq:tikhonov} \\
+\code{inverse.choose\_lambda(J, dV, lambdas, n\_points, solver)}
+  & L-curve corner and curve \\
+\code{inverse.build\_gradient\_op(mesh)} & edge-jump operator $D$ \\
+\code{inverse.tv\_solve(J, dV, alpha, mesh, rho, max\_iter, tol, warm\_start)}
+  & TV reconstruction~\eqref{eq:tv} \\
+\code{utils.make\_phantom(mesh, inclusions, sigma\_background)}
+  & piecewise-constant phantom (circle, ellipse, rectangle, ring, triangle) \\
+\code{utils.plot\_mesh}, \code{plot\_conductivity}, \code{plot\_voltages}
+  & plotting helpers \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\paragraph{Reproducing the results.} All figures in this note are in
+\code{figures/} and are regenerated by \code{python
+scripts/reconstruct\_and\_plot.py} and \code{python
+scripts/verify\_convergence.py --outdir figures}. The scripts run from any
+directory and accept \code{--outdir} and \code{--show}. The golden values
+are regenerated by \code{python tests/test\_golden.py}.
+
+% ================================================================== %
+\section{Limitations}\label{sec:limitations}
+% ================================================================== %
+
+\begin{itemize}
+  \item \emph{Geometry.} Two-dimensional discs only; real bodies are three
+        dimensional, and currents spread out of the electrode plane.
+  \item \emph{Electrodes.} Point electrodes without contact impedance; the
+        complete electrode model~\cite{SomersaloCheneyIsaacson1992} is not
+        implemented, and voltages at driven electrodes cannot be used.
+  \item \emph{Protocol.} Adjacent drive and adjacent measurement only.
+  \item \emph{Imaging.} Linearized difference imaging with a single step;
+        there is no iterative (Gauss--Newton) reconstruction and no absolute
+        imaging.
+  \item \emph{Scale.} $J$ and $J^\top J$ are dense, so memory grows like
+        $E^2$; meshes with more than a few thousand triangles become slow.
+  \item \emph{TV operator.} Edge jumps are not weighted by edge length, so
+        $\alpha$ depends on the mesh size.
+  \item \emph{Uncertainty.} No uncertainty quantification.
+\end{itemize}
+
+% ================================================================== %
+\begin{thebibliography}{99}
+% ================================================================== %
+
+\bibitem{AdlerLionheart2006}
+A.~Adler and W.R.B.~Lionheart.
+\newblock Uses and abuses of EIDORS: an extensible software base for EIT.
+\newblock \emph{Physiological Measurement}, 27(5):S25--S42, 2006.
+
+\bibitem{Borcea2002}
+L.~Borcea.
+\newblock Electrical impedance tomography.
+\newblock \emph{Inverse Problems}, 18(6):R99--R136, 2002.
+
+\bibitem{Boyd2011}
+S.~Boyd, N.~Parikh, E.~Chu, B.~Peleato, and J.~Eckstein.
+\newblock Distributed optimization and statistical learning via the
+  alternating direction method of multipliers.
+\newblock \emph{Foundations and Trends in Machine Learning}, 3(1):1--122,
+  2011.
+
+\bibitem{CheneyIsaacsonNewell1999}
+M.~Cheney, D.~Isaacson, and J.C.~Newell.
+\newblock Electrical impedance tomography.
+\newblock \emph{SIAM Review}, 41(1):85--101, 1999.
+
+\bibitem{Geselowitz1971}
+D.B.~Geselowitz.
+\newblock An application of electrocardiographic lead theory to impedance
+  plethysmography.
+\newblock \emph{IEEE Transactions on Biomedical Engineering}, 18(1):38--41,
+  1971.
 
 \bibitem{Hansen1992}
 P.C.~Hansen.
 \newblock Analysis of discrete ill-posed problems by means of the L-curve.
 \newblock \emph{SIAM Review}, 34(4):561--580, 1992.
 
-\bibitem{Boyd2011}
-S.~Boyd, N.~Parikh, E.~Chu, B.~Peleato, and J.~Eckstein.
-\newblock Distributed optimization and statistical learning via the alternating
-  direction method of multipliers.
-\newblock \emph{Foundations and Trends in Machine Learning}, 3(1):1--122, 2011.
+\bibitem{HansenOLeary1993}
+P.C.~Hansen and D.P.~O'Leary.
+\newblock The use of the L-curve in the regularization of discrete ill-posed
+  problems.
+\newblock \emph{SIAM Journal on Scientific Computing}, 14(6):1487--1503,
+  1993.
 
-\bibitem{AdlerLionheart2006}
-A.~Adler and W.R.B.~Lionheart.
-\newblock Uses and abuses of EIDORS: an extensible software base for EIT.
-\newblock \emph{Physiological Measurement}, 27(5):S25--S42, 2006.
+\bibitem{KaipioSomersalo2007}
+J.~Kaipio and E.~Somersalo.
+\newblock Statistical inverse problems: discretization, model reduction and
+  inverse crimes.
+\newblock \emph{Journal of Computational and Applied Mathematics},
+  198(2):493--504, 2007.
+
+\bibitem{Mandache2001}
+N.~Mandache.
+\newblock Exponential instability in an inverse problem for the
+  Schr\"odinger equation.
+\newblock \emph{Inverse Problems}, 17(5):1435--1444, 2001.
+
+\bibitem{Morozov1966}
+V.A.~Morozov.
+\newblock On the solution of functional equations by the method of
+  regularization.
+\newblock \emph{Soviet Mathematics Doklady}, 7:414--417, 1966.
+
+\bibitem{PerssonStrang2004}
+P.-O.~Persson and G.~Strang.
+\newblock A simple mesh generator in MATLAB.
+\newblock \emph{SIAM Review}, 46(2):329--345, 2004.
+
+\bibitem{RudinOsherFatemi1992}
+L.I.~Rudin, S.~Osher, and E.~Fatemi.
+\newblock Nonlinear total variation based noise removal algorithms.
+\newblock \emph{Physica D}, 60(1--4):259--268, 1992.
+
+\bibitem{SomersaloCheneyIsaacson1992}
+E.~Somersalo, M.~Cheney, and D.~Isaacson.
+\newblock Existence and uniqueness for electrode models for electric current
+  computed tomography.
+\newblock \emph{SIAM Journal on Applied Mathematics}, 52(4):1023--1040, 1992.
 
 \end{thebibliography}
 
