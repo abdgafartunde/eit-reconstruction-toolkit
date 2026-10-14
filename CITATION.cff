@@ -1,0 +1,20 @@
+cff-version: 1.2.0
+message: "If you use eitkit in your work, please cite it as below."
+title: "eitkit: Electrical Impedance Tomography Reconstruction Toolkit"
+type: software
+authors:
+  - family-names: Tiamiyu
+    given-names: "Abd'gafar Tunde"
+    orcid: "https://orcid.org/0000-0003-1641-7196"
+    affiliation: "School of Mathematics, Jilin University"
+version: 0.2.0
+# Concept DOI: always resolves to the latest archived version on Zenodo.
+doi: 10.5281/zenodo.21037312
+license: MIT
+repository-code: "https://github.com/abdgafartunde/eit-reconstruction-toolkit"
+keywords:
+  - electrical impedance tomography
+  - inverse problems
+  - finite element method
+  - Tikhonov regularization
+  - total variation

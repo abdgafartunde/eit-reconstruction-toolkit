@@ -1,0 +1,48 @@
+name: Tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.10", "3.11", "3.12", "3.13"]
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install eitkit with development dependencies
+        run: python -m pip install -e ".[dev]"
+
+      - name: Lint
+        run: ruff check .
+
+      - name: Run tests (including convergence and golden-output tests)
+        run: pytest
+
+      # The scripts must work from any directory, so run them from outside
+      # the repository and write the figures to a separate directory.
+      - name: Run the verification scripts
+        if: matrix.python-version == '3.13'
+        working-directory: ${{ runner.temp }}
+        env:
+          MPLBACKEND: Agg
+        run: |
+          for script in verify_mesh verify_protocol verify_forward verify_jacobian \
+                        verify_utils verify_convergence reconstruct_and_plot; do
+            python "$GITHUB_WORKSPACE/scripts/$script.py" --outdir "$RUNNER_TEMP/figures"
+          done

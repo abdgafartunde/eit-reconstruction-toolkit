@@ -4,14 +4,22 @@ build-backend = "hatchling.build"
 
 [project]
 name = "eitkit"
-version = "0.1.1"
-description = "A modular Python toolkit for Electrical Impedance Tomography: forward simulation, classical regularisation, and learning-based reconstruction."
+version = "0.2.0"
+description = "A modular Python toolkit for 2-D Electrical Impedance Tomography: FEM forward simulation, adjoint Jacobians, and Tikhonov and total-variation reconstruction."
 readme = "README.md"
 license = { file = "LICENSE" }
 authors = [
     { name = "Abd'gafar Tunde Tiamiyu", email = "abdgafartunde@yahoo.com" }
 ]
 requires-python = ">=3.10"
+keywords = ["electrical impedance tomography", "EIT", "inverse problems", "finite element method", "regularization"]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Intended Audience :: Science/Research",
+    "Topic :: Scientific/Engineering :: Mathematics",
+]
 dependencies = [
     "numpy>=1.24",
     "scipy>=1.10",
@@ -19,22 +27,18 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-torch = ["torch>=2.0"]
-jax   = ["jax>=0.4", "jaxlib>=0.4"]
-dev   = [
+dev = [
     "pytest>=7.4",
     "pytest-cov>=4.1",
     "ruff>=0.4",
     "mypy>=1.8",
     "pre-commit>=3.6",
 ]
-docs = [
-    "mkdocs>=1.6",
-    "mkdocs-material>=9.5",
-    "mkdocstrings[python]>=0.25",
-    "mkdocs-gen-files>=0.5",
-    "mkdocs-literate-nav>=0.6",
-]
+
+[project.urls]
+Homepage = "https://github.com/abdgafartunde/eit-reconstruction-toolkit"
+Documentation = "https://github.com/abdgafartunde/eit-reconstruction-toolkit/blob/main/THEORY.md"
+DOI = "https://doi.org/10.5281/zenodo.21037312"
 
 # ---------------------------------------------------------------------------
 # Hatch

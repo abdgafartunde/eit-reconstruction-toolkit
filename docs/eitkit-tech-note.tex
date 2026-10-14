@@ -2,7 +2,7 @@
 
 % ------------------------------------------------------------------ %
 %  eitkit --- Technical Note (software companion document)
-%  Version 0.1.1, July 2026
+%  Version 0.2.0, October 2026
 % ------------------------------------------------------------------ %
 
 \usepackage[american]{babel}
@@ -44,8 +44,8 @@
 {\small School of Mathematics, Jilin University\\[2pt]
  Changchun 130012, Jilin, China}\\[4pt]
 {\small\texttt{abdgafartunde@yahoo.com}}\\[12pt]
-{\small\bfseries Version 0.1.1 --- July 2026}\\[4pt]
-{\small DOI: \texttt{10.5281/zenodo.21319128}}\\[4pt]
+{\small\bfseries Version 0.2.0 --- October 2026}\\[4pt]
+{\small DOI: \texttt{10.5281/zenodo.21037312}}\\[4pt]
 \seprule
 \end{center}
 
@@ -59,8 +59,9 @@ with sparse LU factorisation reuse.  Inverse reconstruction employs classical
 regularisation: Tikhonov (L$^2$) with L-curve parameter selection and Total
 Variation (L$^1$) via ADMM with auto-scaled penalty.  Mesh generation uses the
 DistMesh2D algorithm of Persson \& Strang~(2004).  The toolkit requires only
-NumPy, SciPy, and Matplotlib.  Version~0.1.1 ships with a demo notebook, five
-synthetic phantom shapes, and 154~unit tests.
+NumPy, SciPy, and Matplotlib.  Version~0.2.0 ships with a demo notebook, five
+synthetic phantom shapes, and 173~tests, including a mesh-convergence check
+against the closed-form solution on the uniform disc.
 \end{abstract}
 
 % ------------------------------------------------------------------ %
@@ -234,8 +235,7 @@ pip install -e ".[dev]"
 \end{verbatim}
 
 The core dependency stack is NumPy $\ge$\,1.24, SciPy $\ge$\,1.10, and
-Matplotlib $\ge$\,3.7.  Optional extras include PyTorch and JAX for future
-learning-based extensions.  A complete interactive example is provided in
+Matplotlib $\ge$\,3.7.  A complete interactive example is provided in
 \texttt{examples/01\_reconstruction\_demo.ipynb}.
 
 % ------------------------------------------------------------------ %

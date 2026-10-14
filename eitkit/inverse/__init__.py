@@ -3,10 +3,8 @@ eitkit.inverse — Reconstruction algorithms.
 
 Sub-packages
 ------------
-classical       Tikhonov, Gauss-Newton, TV, back-projection, GREIT, D-bar.
-data_driven     CNN, U-Net (Phase 3).
-physics_informed  PINN, deep image prior (Phase 4).
-hybrid          Algorithm unrolling, learned regulariser (Phase 4).
+classical       Linearised difference reconstruction: Tikhonov (L2) with
+                L-curve parameter choice, and total variation (L1) via ADMM.
 """
 
 from eitkit.inverse.classical import (

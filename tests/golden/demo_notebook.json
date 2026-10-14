@@ -1,0 +1,12 @@
+{
+  "n_nodes": 604,
+  "n_elements": 1126,
+  "n_boundary_nodes": 80,
+  "norm_dV_clean": 0.03086809060534686,
+  "norm_dV_noisy": 0.030876319738830326,
+  "linearisation_error": 0.2686320303526612,
+  "tikhonov_rel_error": 0.5790298168708461,
+  "tikhonov_rel_residual": 0.01702761973989087,
+  "tv_rel_error": 0.42649840070369804,
+  "tv_rel_residual": 0.016164171319397205
+}
