@@ -284,7 +284,7 @@ three vertices of $T_e$. The adjacent protocol uses at most $L$ distinct
 measurement pairs, so \code{compute\_jacobian} needs $L$ forward and at most
 $L$ adjoint solves, all with a single sparse factorization, rather than one
 adjoint solve per measurement; it assembles $J$ in a few milliseconds
-(Table~\ref{tab:timing}).
+(Section~\ref{sec:example}).
 
 \subsection{What the Jacobian tells you}
 
@@ -460,20 +460,21 @@ script from outside the repository, and executes both notebooks.
 
 The example in \code{scripts/reconstruct\_and\_plot.py}, the demo notebook,
 and the tutorial uses $L=16$ electrodes, $h_0=0.08$ (604 nodes, 1126
-triangles), unit current, a background conductivity of 1\,S/m with a disc of
-1.6\,S/m and an ellipse of 0.5\,S/m (Figure~\ref{fig:setup}), and white
-Gaussian noise at 45\,dB SNR. The difference voltages are shown in
-Figure~\ref{fig:voltages}, the L-curve in Figure~\ref{fig:lcurve}, and the
-reconstructions in Figure~\ref{fig:reconstructions}.
+triangles), unit current, and a background conductivity of 1\,S/m with a
+disc of 1.6\,S/m and an ellipse of 0.5\,S/m (Figure~\ref{fig:setup}).
 
-\begin{figure}[ht]
+\begin{figure}[!htbp]
 \centering
 \includegraphics[width=0.85\textwidth]{01_mesh_and_phantom.png}
 \caption{Mesh with the 16 electrodes, and the true conductivity.}
 \label{fig:setup}
 \end{figure}
 
-\begin{figure}[ht]
+\paragraph{Data.} White Gaussian noise at 45\,dB SNR is added to the
+difference voltages (Figure~\ref{fig:voltages}); at this level the noise is
+about 0.6\% of the signal.
+
+\begin{figure}[!htbp]
 \centering
 \includegraphics[width=0.85\textwidth]{02_voltage_data.png}
 \caption{Clean and noisy difference voltages, arranged by drive step and
@@ -481,14 +482,32 @@ measurement pair.}
 \label{fig:voltages}
 \end{figure}
 
-\begin{figure}[ht]
+\paragraph{Regularization parameter.} Figure~\ref{fig:lcurve} shows the
+L-curve and its corner, $\lambda=2.3\times10^{-9}$. The reconstructions
+below use the fixed value $\lambda=10^{-7}$, close to the best value
+$6.3\times10^{-8}$ (Table~\ref{tab:errors}).
+
+\begin{figure}[!htbp]
 \centering
-\includegraphics[width=0.48\textwidth]{03_lcurve.png}
+\includegraphics[width=0.45\textwidth]{03_lcurve.png}
 \caption{L-curve and the corner returned by \code{choose\_lambda}.}
 \label{fig:lcurve}
 \end{figure}
 
-\begin{figure}[ht]
+\paragraph{Reconstructions.} Figure~\ref{fig:reconstructions} shows the
+Tikhonov and TV reconstructions, and Table~\ref{tab:errors} lists the
+relative errors $\|\dsig-\dsig_{\text{true}}\|/\|\dsig_{\text{true}}\|$.
+TV recovers both inclusions with sharp boundaries and a flat background; both
+methods underestimate the contrast, because a single linearized step cannot
+reach the full contrast and the regularization pulls the solution towards
+zero. To avoid the \emph{inverse crime}~\cite{KaipioSomersalo2007}, the last
+column of Table~\ref{tab:errors} uses data simulated on a finer mesh
+($h_0=0.04$, 4506 triangles) and reconstructed on the $h_0=0.08$ mesh. The
+errors hardly change: since the mesh fix, the discretization error at
+$h_0=0.08$ (below 1\% in the voltages) is small compared with the
+linearization and regularization errors.
+
+\begin{figure}[!htbp]
 \centering
 \includegraphics[width=\textwidth]{04_reconstructions.png}
 \caption{True conductivity, Tikhonov reconstruction ($\lambda=10^{-7}$), and
@@ -496,18 +515,7 @@ TV reconstruction ($\alpha=5\times10^{-8}$).}
 \label{fig:reconstructions}
 \end{figure}
 
-Table~\ref{tab:errors} lists the relative errors
-$\|\dsig-\dsig_{\text{true}}\|/\|\dsig_{\text{true}}\|$. TV recovers both
-inclusions with sharp boundaries and a flat background; both methods
-underestimate the contrast, because a single linearized step cannot reach
-the full contrast and the regularization pulls the solution towards zero. To
-avoid the \emph{inverse crime}~\cite{KaipioSomersalo2007}, the last column
-uses data simulated on a finer mesh ($h_0=0.04$, 4506 triangles) and
-reconstructed on the $h_0=0.08$ mesh. The errors hardly change: since the
-mesh fix, the discretization error at $h_0=0.08$ (below 1\% in the voltages)
-is small compared with the linearization and regularization errors.
-
-\begin{table}[ht]
+\begin{table}[!htbp]
 \centering
 \caption{Relative reconstruction errors for the example (45\,dB SNR).}
 \label{tab:errors}
@@ -523,7 +531,11 @@ TV, $\alpha = 5\times10^{-8}$                     & 0.426 & 0.419 \\
 \end{tabular}
 \end{table}
 
-\begin{table}[ht]
+\paragraph{Run times.} Table~\ref{tab:timing} lists wall-clock times for
+three mesh sizes. Mesh generation dominates; the forward solves, the
+Jacobian, and the Tikhonov solve take milliseconds.
+
+\begin{table}[!htbp]
 \centering
 \caption{Wall-clock times (Apple M-series laptop, Python 3.13) for a
 single-disc phantom; TV uses 300 iterations.}
@@ -577,6 +589,8 @@ contrast too small.
 % ================================================================== %
 \section{Software reference}
 % ================================================================== %
+
+Table~\ref{tab:api} lists the public functions.
 
 \paragraph{Conventions.} Conductivities are per triangle, in S/m; currents
 in A; voltages in V; lengths in units of the radius. Arrays are NumPy
