@@ -281,8 +281,7 @@ def plot_voltages(
     # Use a masked array so NaN cells get the 'bad' colour
     mat_masked = np.ma.masked_invalid(mat)
     # Light grey for unmeasured cells
-    current_cmap = plt.colormaps.get_cmap(cmap).copy()
-    current_cmap.set_bad(color="0.85")
+    current_cmap = plt.colormaps.get_cmap(cmap).with_extremes(bad="0.85")
 
     im = ax.imshow(
         mat_masked,
@@ -294,7 +293,7 @@ def plot_voltages(
         interpolation="nearest",
         **kwargs,
     )
-    cbar = fig.colorbar(im, ax=ax, label="δV (V)", shrink=0.82)
+    fig.colorbar(im, ax=ax, label="δV (V)", shrink=0.82)
 
     # Thin grid to delineate cells
     ax.set_xticks(np.arange(-0.5, L, 1), minor=True)

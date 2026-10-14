@@ -77,7 +77,8 @@ class TestAssembleK:
 
 class TestSimulate:
     @pytest.fixture(scope="class")
-    def protocol(self):
+    @classmethod
+    def protocol(cls):
         return adjacent_pattern(16), measurement_pairs(16)
 
     def test_output_shape(self, circle_mesh, electrodes, protocol):
@@ -158,7 +159,8 @@ class TestSimulate:
 
 class TestComputeJacobian:
     @pytest.fixture(scope="class")
-    def jacobian_data(self, circle_mesh, electrodes):
+    @classmethod
+    def jacobian_data(cls, circle_mesh, electrodes):
         drive = adjacent_pattern(16)
         meas = measurement_pairs(16)
         sigma = np.ones(circle_mesh.n_elements)

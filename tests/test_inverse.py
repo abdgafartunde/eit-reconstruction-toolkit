@@ -233,7 +233,8 @@ class TestIntegration:
     """End-to-end tests using the full eitkit forward stack."""
 
     @pytest.fixture(scope="class")
-    def forward_data(self, circle_mesh, electrodes):
+    @classmethod
+    def forward_data(cls, circle_mesh, electrodes):
         """Build J and dV from the shared session-scoped mesh/electrodes."""
         from eitkit.forward import compute_jacobian, simulate
         from eitkit.protocol import adjacent_pattern, measurement_pairs

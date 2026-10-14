@@ -280,7 +280,8 @@ class TestPlotConductivity:
 
 class TestPlotVoltages:
     @pytest.fixture(scope="class")
-    def dv(self, circle_mesh, electrodes):
+    @classmethod
+    def dv(cls, circle_mesh, electrodes):
         drive = adjacent_pattern(16)
         meas = measurement_pairs(16)
         sigma = make_phantom(
