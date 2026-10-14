@@ -205,7 +205,7 @@ def choose_lambda(
     -----
     The corner is the point of maximum signed curvature of the L-curve in
     log-log space, with derivatives taken with respect to
-    :math:`\\log_{10}\\lambda` by finite differences [Hansen1992]_.
+    :math:`\log_{10}\lambda` by finite differences [Hansen1992]_.
 
     .. [Hansen1992] Hansen, P.C. (1992). Analysis of discrete ill-posed problems
        by means of the L-curve. *SIAM Review*, 34(4), 561–580.
@@ -221,6 +221,12 @@ def choose_lambda(
             n_points,
         )
     lambdas = np.asarray(lambdas, dtype=np.float64)
+    if lambdas.ndim != 1 or not np.all(np.isfinite(lambdas)) or np.any(lambdas <= 0):
+        raise ValueError("lambdas must be a 1-D array of positive finite values")
+    if np.unique(lambdas).size != lambdas.size:
+        raise ValueError("lambdas must not contain duplicate values")
+    if len(lambdas) < 3:
+        raise ValueError("choose_lambda needs at least 3 candidate values")
 
     residuals = np.empty(len(lambdas))
     solution_norms = np.empty(len(lambdas))
@@ -235,8 +241,6 @@ def choose_lambda(
     #     kappa = (x' y'' - y' x'') / (x'^2 + y'^2)^(3/2).
     # The denominator matters: without it the "corner" lands wherever the
     # curve moves fastest per unit t, independently of the noise level.
-    if len(lambdas) < 3:
-        raise ValueError("choose_lambda needs at least 3 candidate values")
     # Evaluate the curvature along increasing lambda (its sign depends on
     # the direction of travel); the returned arrays keep the caller's order.
     order = np.argsort(lambdas)

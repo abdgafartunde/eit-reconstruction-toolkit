@@ -1,4 +1,4 @@
-# eitkit — EIT Reconstruction Toolkit
+# eitkit: EIT Reconstruction Toolkit
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE) 
 [![DOI](https://zenodo.org/badge/1231635377.svg)](https://doi.org/10.5281/zenodo.21037312)
@@ -27,7 +27,7 @@ forward simulation, Jacobian computation, and classical inverse reconstruction.
 
 Two inclusions (sigma = 1.6 and 0.5 S/m in a 1 S/m background), 16 electrodes,
 45 dB SNR. TV/ADMM recovers the sharp boundaries that Tikhonov smooths out
-(relative errors 0.427 and 0.579). More figures, and how to regenerate them,
+(relative errors: TV 0.395, Tikhonov 0.579). More figures, and how to regenerate them,
 are in [`figures/`](figures/).
 
 ---
@@ -100,15 +100,17 @@ phantoms, L-curve analysis, and side-by-side comparisons.
 
 ## Documentation
 
+- **[examples/00_getting_started.ipynb](examples/00_getting_started.ipynb)**:
+  the tutorial; start here.
 - **[docs/eitkit-tech-note.pdf](docs/eitkit-tech-note.pdf)**: the technical
-  note. The model and algorithms as implemented, verification results,
+  note, with the model and algorithms as implemented, verification results,
   parameter guidance, API reference, and limitations.
-- **[THEORY.md](THEORY.md)** — Full mathematical formulation (forward problem,
+- **[THEORY.md](THEORY.md)**: full mathematical formulation (forward problem,
   FEM discretisation, adjoint Jacobian, Tikhonov, TV/ADMM, DistMesh2D).
-- **[examples/01_reconstruction_demo.ipynb](examples/01_reconstruction_demo.ipynb)** —
-  Interactive notebook with configurable hyperparameters.
-- **[scripts/reconstruct_and_plot.py](scripts/reconstruct_and_plot.py)** —
-  Standalone script that generates publication-quality figures.
+- **[examples/01_reconstruction_demo.ipynb](examples/01_reconstruction_demo.ipynb)**:
+  interactive notebook with configurable hyperparameters.
+- **[scripts/reconstruct_and_plot.py](scripts/reconstruct_and_plot.py)**:
+  standalone script that generates publication-quality figures.
 
 ---
 
@@ -144,7 +146,7 @@ electrode voltages converge to it at roughly second order:
 ## Running tests
 
 ```bash
-pytest          # 173 tests
+pytest          # 185 tests
 ```
 
 The suite includes the convergence check above and a golden-output test that

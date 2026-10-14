@@ -11,7 +11,7 @@ Algorithm summary
 2. Add fixed boundary nodes exactly on the circle, spaced at most ``h0``
    apart and including the $L$ electrode angles.
 3. Triangulate the points with scipy.spatial.Delaunay.
-4. Remove triangles whose circumcentre lies outside the domain.
+4. Remove triangles whose centroid lies outside the domain.
 5. Iterate: compute internal "spring" forces along edges, move nodes,
    re-project boundary nodes onto the circle, re-triangulate.
 6. Enforce CCW winding and re-compute areas.

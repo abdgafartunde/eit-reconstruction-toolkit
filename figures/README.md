@@ -17,7 +17,7 @@ from `scripts/reconstruct_and_plot.py`:
   matrices.
 - `03_lcurve.png`: L-curve for the Tikhonov parameter.
 - `04_reconstructions.png`: true conductivity, Tikhonov (lambda = 1e-7), and
-  TV/ADMM (alpha = 5e-8). Relative errors 0.579 and 0.427.
+  TV/ADMM (alpha = 5e-8, run to convergence). Relative errors 0.579 and 0.395.
 - `05_perturbations.png`: the same results as perturbations
   delta sigma = sigma - sigma_0 on a symmetric colour scale.
 

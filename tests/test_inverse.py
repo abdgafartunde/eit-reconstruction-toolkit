@@ -346,3 +346,16 @@ class TestLCurveCorner:
         J, dV, _ = eit_system
         with pytest.raises(ValueError):
             choose_lambda(J, dV, lambdas=np.array([1e-8, 1e-6]))
+
+
+class TestChooseLambdaValidation:
+    def test_rejects_duplicates(self, small_system):
+        J, dV, _ = small_system
+        with pytest.raises(ValueError):
+            choose_lambda(J, dV, lambdas=np.array([1e-6, 1e-4, 1e-4, 1e-2]))
+
+    @pytest.mark.parametrize("bad", [0.0, -1e-3])
+    def test_rejects_nonpositive(self, small_system, bad):
+        J, dV, _ = small_system
+        with pytest.raises(ValueError):
+            choose_lambda(J, dV, lambdas=np.array([bad, 1e-4, 1e-2, 1.0]))

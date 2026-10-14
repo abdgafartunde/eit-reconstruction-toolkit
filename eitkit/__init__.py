@@ -15,6 +15,6 @@ from importlib.metadata import PackageNotFoundError, version
 try:
     __version__: str = version("eitkit")
 except PackageNotFoundError:  # running from source without install
-    __version__ = "0.1.0.dev0"
+    __version__ = "unknown"
 
 __all__ = ["__version__"]

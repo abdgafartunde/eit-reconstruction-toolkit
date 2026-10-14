@@ -225,7 +225,7 @@ $(i,j,k)$, and the element stiffness matrix is
 The boundary condition~\eqref{eq:gap} becomes the load vector $f$ with
 $f_{e^+}=+I$, $f_{e^-}=-I$ at the electrode nodes and zeros elsewhere
 (\code{build\_load\_vector}). $K$ is singular, with the constants in its
-kernel; the interior node nearest the centre is grounded ($u=0$) by
+kernel; the interior node nearest the center is grounded ($u=0$) by
 symmetric row and column elimination (\code{pick\_ground\_node},
 \code{apply\_dirichlet\_bc}). In \code{simulate} and \code{compute\_jacobian}
 the modified matrix is factorized once with a sparse LU decomposition
@@ -291,7 +291,7 @@ adjoint solve per measurement; it assembles $J$ in a few milliseconds
 The singular values of $J$ decay quickly: at $h_0 = 0.08$ the 104 nonzero
 singular values span about $5\times10^{5}$. The column norms of $J$ per unit
 area measure the sensitivity of the data to each region; they fall by more
-than an order of magnitude from the electrodes to the centre, which is why
+than an order of magnitude from the electrodes to the center, which is why
 EIT reconstructions are least resolved in the middle of the domain (see the
 sensitivity map in the tutorial).
 
@@ -335,10 +335,13 @@ The L-curve is a heuristic. In the example of Section~\ref{sec:example} it
 selects $\lambda = 2.3\times10^{-9}$ (relative error 0.69), against an
 error of 0.58 for the best $\lambda$, which can only be found when the truth
 is known. The \emph{discrepancy principle}~\cite{Morozov1966}, which chooses
-$\lambda$ so that the residual matches the noise level, is unreliable in
-linearized difference EIT: the residual is dominated by the linearization
-error (27\% of $\|\dV\|$ in the example) rather than by the noise (0.6\% at
-45\,dB), so it must be applied with an estimate of the total misfit.
+$\lambda$ so that the residual $\|J\dsig_\lambda-\dV\|$ matches the noise
+norm, fails here. The clean data lie in the range of $J$ (the part outside
+it is $1.6\times10^{-14}$ of $\|\dV\|$), so the linearization error is fitted
+as if it were signal and does not show up in the residual; meanwhile 71\% of
+the noise lies outside the 104-dimensional range of $J$ and can never be
+fitted. With the residual equal to the noise norm, the principle selects
+$\lambda\approx9\times10^{-11}$, and the relative error is 1.9.
 
 \subsection{Total-variation regularization}
 
@@ -362,23 +365,41 @@ $H = J^\top J+\rho D^\top D$ is symmetric positive definite and is factorized
 once, so each iteration costs one pair of triangular solves and a few sparse
 products. With \code{rho="auto"} the penalty is
 $\rho = \operatorname{tr}(J^\top J)/\operatorname{tr}(D^\top D)$, which
-balances the two terms of $H$.
+balances the two terms of $H$. The iteration stops when both the primal
+residual $r$ and the dual residual $s$ are small (Boyd et al.~\cite{Boyd2011},
+Section~3.3.1), with $F$ the number of interior edges; the absolute
+tolerance (default $10^{-8}$, in units of $\dsig$) matters only when the
+solution is nearly constant. ADMM converges slowly, and more slowly for small
+$\alpha$: in the example below, \code{tol = 1e-4} is met after about 1500
+iterations for $\alpha=2\times10^{-7}$, 3300 for $5\times10^{-8}$, and 24\,000
+for $10^{-8}$. The default \code{max\_iter} is 50\,000, and \code{tv\_solve}
+warns if it is reached first. A warm start initializes $z$; the dual variable
+restarts at zero, so it does not necessarily shorten the run.
+
+Version~0.2.0 changed the stopping test. Earlier versions tested only the
+primal residual, with a default of 200 iterations, which stopped far from the
+minimizer: in the example, 300 iterations gave a relative error of 0.427
+against 0.395 at convergence.
 
 \begin{algorithm}[ht]
 \caption{ADMM for TV-regularized difference EIT (\code{tv\_solve})}
 \label{alg:admm}
 \begin{algorithmic}[1]
-\Require $J$, $\dV$, $\alpha>0$, $\rho>0$, tolerance $\varepsilon$, starting
-point $\dsig^0$ (zero, or \code{warm\_start})
-\State factorize $H = J^\top J + \rho D^\top D$; set $z^0=u^0=0$,
-$\kappa = \alpha/\rho$
+\Require $J$, $\dV$, $\alpha>0$, $\rho>0$, tolerances $\varepsilon$
+(\code{tol}) and $\varepsilon_a$ (\code{abs\_tol}), starting point
+$\dsig^0$ (zero, or \code{warm\_start})
+\State factorize $H = J^\top J + \rho D^\top D$; set $z^0=D\dsig^0$,
+$u^0=0$, $\kappa = \alpha/\rho$
 \For{$k = 0,1,\dots,\code{max\_iter}-1$}
   \State $\dsig^{k+1} = H^{-1}\bigl(J^\top\dV + \rho D^\top(z^k-u^k)\bigr)$
   \State $z^{k+1} = \mathcal S_\kappa\bigl(D\dsig^{k+1}+u^k\bigr)$
   \Comment{$\mathcal S_\kappa(v) = \operatorname{sign}(v)\max(|v|-\kappa,0)$}
   \State $u^{k+1} = u^k + D\dsig^{k+1} - z^{k+1}$
-  \If{$\|D\dsig^{k+1}-z^{k+1}\| \le \varepsilon\max\bigl(\|D\dsig^{k+1}\|,
-  \|z^{k+1}\|, 1\bigr)$} \textbf{stop} \EndIf
+  \State $r = \|D\dsig^{k+1}-z^{k+1}\|$,\quad
+    $s = \rho\|D^\top(z^{k+1}-z^k)\|$
+  \If{$r \le \sqrt F\varepsilon_a + \varepsilon\max(\|D\dsig^{k+1}\|,
+    \|z^{k+1}\|)$ \textbf{and} $s \le \rho\bigl(\sqrt E\varepsilon_a +
+    \varepsilon\|D^\top u^{k+1}\|\bigr)$} \textbf{stop} \EndIf
 \EndFor
 \State \Return $\dsig^{k+1}$
 \end{algorithmic}
@@ -395,10 +416,11 @@ the closed form~\eqref{eq:exact} on the uniform unit disc, for every drive
 step of the adjacent protocol and all 13 measurements per step, on meshes
 with $h_0$ from 0.2 to 0.025. Table~\ref{tab:convergence} and
 Figure~\ref{fig:convergence} show the mean relative error. It decreases at
-every level, at a rate close to two; the meshes are not nested, so the
-observed rate varies between levels. Before the mesh fix of
-version~0.2.0 the same study gave errors of 0.25, 0.10, and 0.027 at
-$h_0=0.1$, $0.05$, and $0.025$, without monotone decrease.
+every level. The meshes are not nested, so the rate between consecutive
+levels varies (from 0.9 to 3.6); a least-squares fit of $\log$ error against
+$\log h_0$ gives a slope of 2.6. Before the mesh fix of version~0.2.0, the
+same study gave errors of 0.30, 0.41, 0.25, 0.31, 0.10, 0.13, and 0.027 for
+the same seven meshes, rising at three of the six refinements.
 
 \begin{table}[ht]
 \centering
@@ -444,10 +466,11 @@ with an $O(h_0^2)$ reference line.}
 
 \subsection{Automated tests}
 
-The test suite (177 tests, \code{pytest}) checks mesh validity and quality,
+The test suite (185 tests, \code{pytest}) checks mesh validity and quality,
 the protocol, the forward solver and Jacobian, both reconstruction methods,
 the L-curve corner (including its dependence on the noise level), the
-phantoms and plotting helpers, boundary resolution and forward convergence
+phantoms and plotting helpers, the ADMM stopping test (including a
+constant solution) and warm start, boundary resolution and forward convergence
 against~\eqref{eq:exact}, and a golden-output test that reruns the demo
 notebook's pipeline and compares mesh counts, voltages, and reconstruction
 errors with stored values (\code{tests/golden/demo\_notebook.json}).
@@ -471,8 +494,8 @@ disc of 1.6\,S/m and an ellipse of 0.5\,S/m (Figure~\ref{fig:setup}).
 \end{figure}
 
 \paragraph{Data.} White Gaussian noise at 45\,dB SNR is added to the
-difference voltages (Figure~\ref{fig:voltages}); at this level the noise is
-about 0.6\% of the signal.
+difference voltages (Figure~\ref{fig:voltages}); at this level the noise norm
+is about 0.5\% of the signal norm.
 
 \begin{figure}[!htbp]
 \centering
@@ -503,7 +526,7 @@ reach the full contrast and the regularization pulls the solution towards
 zero. To avoid the \emph{inverse crime}~\cite{KaipioSomersalo2007}, the last
 column of Table~\ref{tab:errors} uses data simulated on a finer mesh
 ($h_0=0.04$, 4506 triangles) and reconstructed on the $h_0=0.08$ mesh. The
-errors hardly change: since the mesh fix, the discretization error at
+errors hardly change (Tikhonov is even slightly better): since the mesh fix, the discretization error at
 $h_0=0.08$ (below 1\% in the voltages) is small compared with the
 linearization and regularization errors.
 
@@ -526,28 +549,29 @@ method & same-mesh data & fine-mesh data \\
 Tikhonov, $\lambda = 10^{-7}$ (fixed)            & 0.579 & -- \\
 Tikhonov, $\lambda = 6.3\times10^{-8}$ (best)     & 0.575 & -- \\
 Tikhonov, $\lambda = 2.3\times10^{-9}$ (L-curve)  & 0.689 & 0.659 \\
-TV, $\alpha = 5\times10^{-8}$                     & 0.426 & 0.419 \\
+TV, $\alpha = 5\times10^{-8}$                     & 0.395 & 0.396 \\
 \bottomrule
 \end{tabular}
 \end{table}
 
 \paragraph{Run times.} Table~\ref{tab:timing} lists wall-clock times for
-three mesh sizes. Mesh generation dominates; the forward solves, the
-Jacobian, and the Tikhonov solve take milliseconds.
+three mesh sizes. The forward solves, the Jacobian, and the Tikhonov solve
+take milliseconds; mesh generation and the TV iterations take seconds.
 
 \begin{table}[!htbp]
 \centering
 \caption{Wall-clock times (Apple M-series laptop, Python 3.13) for a
-single-disc phantom; TV uses 300 iterations.}
+single-disc phantom; TV is run to convergence with the default tolerances
+(4912, 2051, and 1554 iterations).}
 \label{tab:timing}
 \begin{tabular}{rrcccc}
 \toprule
 $h_0$ & triangles & mesh & \code{simulate} + \code{compute\_jacobian} &
 Tikhonov & TV \\
 \midrule
-0.10 &  712 & 0.48\,s & 0.006\,s & 0.003\,s & 0.07\,s \\
-0.08 & 1126 & 0.82\,s & 0.006\,s & 0.008\,s & 0.16\,s \\
-0.05 & 2890 & 2.31\,s & 0.016\,s & 0.083\,s & 1.22\,s \\
+0.10 &  712 & 0.48\,s & 0.006\,s & 0.003\,s & 0.93\,s \\
+0.08 & 1126 & 0.82\,s & 0.006\,s & 0.008\,s & 0.77\,s \\
+0.05 & 2890 & 2.31\,s & 0.016\,s & 0.083\,s & 3.85\,s \\
 \bottomrule
 \end{tabular}
 \end{table}
@@ -571,13 +595,14 @@ times smaller and larger, and prefer the largest $\lambda$ that keeps the
 features you expect. For the example ($I=1$, unit disc, $h_0=0.08$), good
 values lie between $10^{-9}$ and $10^{-7}$.
 
-\paragraph{TV parameter $\alpha$.} In the example, $\alpha$ between
-$5\times10^{-8}$ and $10^{-7}$ gives the smallest errors (0.426 and 0.418);
-$\alpha=10^{-8}$ and $2\times10^{-7}$ give 0.458 and 0.452. Because $D$ is
-not weighted by edge length, retune $\alpha$ when you change $h_0$. ADMM
-usually converges within a few hundred iterations; increase
-\code{max\_iter} or decrease \code{tol} if the result changes between runs
-with more iterations, and use \code{warm\_start} when sweeping $\alpha$.
+\paragraph{TV parameter $\alpha$.} In the example, with ADMM run to
+convergence, the relative error is 0.436, 0.404, 0.395, 0.419, and 0.470 for
+$\alpha = 10^{-8}$, $2\times10^{-8}$, $5\times10^{-8}$, $10^{-7}$, and
+$2\times10^{-7}$, so values between $3\times10^{-8}$ and $5\times10^{-8}$ are
+best. Because $D$ is not weighted by edge length, retune $\alpha$ when you
+change $h_0$. Small values of $\alpha$ need many more ADMM iterations; if
+\code{tv\_solve} warns that it reached \code{max\_iter}, increase it rather
+than accept the result.
 
 \paragraph{Noise and contrast.} \code{add\_noise(dV, snr\_db, rng)} adds
 white Gaussian noise at a prescribed SNR over the whole vector. Real systems
@@ -658,6 +683,9 @@ are regenerated by \code{python tests/test\_golden.py}.
         imaging.
   \item \emph{Scale.} $J$ and $J^\top J$ are dense, so memory grows like
         $E^2$; meshes with more than a few thousand triangles become slow.
+  \item \emph{ADMM.} Convergence is slow for small $\alpha$ (tens of
+        thousands of iterations); no accelerated or preconditioned variant is
+        implemented.
   \item \emph{TV operator.} Edge jumps are not weighted by edge length, so
         $\alpha$ depends on the mesh size.
   \item \emph{Uncertainty.} No uncertainty quantification.
