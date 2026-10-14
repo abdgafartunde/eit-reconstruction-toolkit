@@ -28,39 +28,32 @@ The toolkit uses only NumPy, SciPy, and Matplotlib — no external mesh librarie
 Let $\Omega \subset \mathbb{R}^2$ be a bounded domain with Lipschitz boundary $\partial\Omega$. Given a conductivity distribution $\sigma \in L^\infty(\Omega)$ with $\sigma(x) \ge c > 0$, the electric potential $u \in H^1(\Omega)$ satisfies the elliptic boundary value problem
 
 $$
-\begin{aligned}
--\nabla \cdot (\sigma \nabla u) &= 0 \quad &&\text{in } \Omega, \\[4pt]
-\sigma \frac{\partial u}{\partial n} &= j \quad &&\text{on } \partial\Omega,
-\end{aligned}
+-\nabla \cdot (\sigma \nabla u) = 0 \quad \text{in} \Omega,
 $$
 
-where $j$ is the applied current density satisfying the conservation condition $\int_{\partial\Omega} j \, ds = 0$. To obtain a unique solution, a ground condition $u(x_0) = 0$ is imposed at one interior node.
+$$
+\sigma \frac{\partial u}{\partial n} = j \quad \text{on} \partial\Omega,
+$$
+
+where $j$ is the applied current density satisfying the conservation condition $\int_{\partial\Omega} j \thinspace ds = 0$. To obtain a unique solution, a ground condition $u(x_0) = 0$ is imposed at one interior node.
 
 ### 2.2 Gap Electrode Model
 
-In Phase 1, each of the $L$ electrodes is modelled as a single boundary node (the **gap model**). A stimulation pair $(e^+, e^-)$ injects current $+I$ at electrode $e^+$ and extracts $-I$ at $e^-$. The Neumann load vector $f \in \mathbb{R}^N$ has entries
-
-$$
-f_i = \begin{cases}
-+I & \text{if node } i \text{ is electrode } e^+, \\[2pt]
--I & \text{if node } i \text{ is electrode } e^-, \\[2pt]
-0  & \text{otherwise}.
-\end{cases}
-$$
+In Phase 1, each of the $L$ electrodes is modelled as a single boundary node (the **gap model**). A stimulation pair $(e^+, e^-)$ injects current $+I$ at electrode $e^+$ and extracts $-I$ at $e^-$. The Neumann load vector $f \in \mathbb{R}^N$ has entries $f_i = +I$ if node $i$ is electrode $e^+$, $f_i = -I$ if node $i$ is electrode $e^-$, and $f_i = 0$ otherwise.
 
 ### 2.3 Finite Element Discretisation
 
 The domain is triangulated with $M$ linear (P1) elements on $N$ nodes. Writing $u = \sum_{i=1}^N u_i \varphi_i$ where $\varphi_i$ are the P1 hat functions, the weak form yields the linear system
 
 $$
-K(\sigma) \, u = f,
+K(\sigma) \thinspace u = f,
 $$
 
 where the global stiffness matrix is assembled element-wise:
 
 $$
 K = \sum_{e=1}^{M} K^e, \qquad
-K^e_{ij} = \frac{\sigma_e}{4 A_e} \bigl( b_i b_j + c_i c_j \bigr), \quad i,j \in \{0,1,2\}.
+K^e_{ij} = \frac{\sigma_e}{4 A_e} \bigl( b_i b_j + c_i c_j \bigr), \quad i,j \in \lbrace 0,1,2\rbrace .
 $$
 
 The element gradient coefficients are defined on the reference triangle with nodes $(x_0,y_0), (x_1,y_1), (x_2,y_2)$ (indices mod 3):
@@ -92,7 +85,7 @@ $$
 Linearising around $\sigma_0$ gives the Born approximation
 
 $$
-\delta V \approx J(\sigma_0) \, \delta\sigma,
+\delta V \approx J(\sigma_0) \thinspace \delta\sigma,
 $$
 
 where $J \in \mathbb{R}^{P \times M}$ is the **Jacobian** (sensitivity matrix) and $\delta\sigma = \sigma - \sigma_0 \in \mathbb{R}^M$ is the conductivity perturbation.
@@ -102,7 +95,7 @@ where $J \in \mathbb{R}^{P \times M}$ is the **Jacobian** (sensitivity matrix) a
 The entry $J_{ie} = \partial V_i / \partial \sigma_e$ is computed efficiently using the **adjoint method**. For measurement $i$ associated with drive step $k$ and electrode pair $(e^+, e^-)$,
 
 $$
-J_{ie} = -\int_{\Omega_e} \nabla u_k \cdot \nabla \phi_i \, d\Omega,
+J_{ie} = -\int_{\Omega_e} \nabla u_k \cdot \nabla \phi_i \thinspace d\Omega,
 $$
 
 where $u_k$ is the forward potential for drive step $k$ and $\phi_i$ is the **adjoint potential**: the solution with a unit current injected at $e^+$ and extracted at $e^-$.
@@ -126,7 +119,7 @@ where $\mathbf{b}_e, \mathbf{c}_e \in \mathbb{R}^3$ are the element gradient coe
 The classical Tikhonov solution minimises
 
 $$
-\delta\hat\sigma = \arg\min_{\delta\sigma} \left\{ \tfrac{1}{2} \| J \,\delta\sigma - \delta V \|_2^2 + \lambda \| \delta\sigma \|_2^2 \right\},
+\delta\hat\sigma = \arg\min_{\delta\sigma} \left\lbrace \tfrac{1}{2} \Vert J \thinspace \delta\sigma - \delta V \Vert_2^2 + \lambda \Vert \delta\sigma \Vert_2^2 \right\rbrace ,
 $$
 
 with closed-form solution via the normal equations:
@@ -137,14 +130,14 @@ $$
 
 Two solvers are provided:
 - **`direct`**: `numpy.linalg.solve` on the $(M, M)$ normal-equations system — fast for $M \lesssim 10^4$.
-- **`lsqr`**: iterative `scipy.sparse.linalg.lsqr` on the augmented system $[J; \sqrt{\lambda} I] \, \delta\sigma = [\delta V; 0]$.
+- **`lsqr`**: iterative `scipy.sparse.linalg.lsqr` on the augmented system $[J; \sqrt{\lambda} I] \thinspace \delta\sigma = [\delta V; 0]$.
 
 ### 3.2 L-Curve Heuristic
 
 The regularisation parameter $\lambda$ is chosen automatically via the L-curve method (Hansen, 1992). The L-curve is the log-log plot of residual norm vs. solution norm:
 
 $$
-\mathcal{C}(\lambda) = \bigl( \log\| J \,\delta\hat\sigma(\lambda) - \delta V \|,\; \log\| \delta\hat\sigma(\lambda) \| \bigr).
+\mathcal{C}(\lambda) = \bigl( \log\Vert J \thinspace \delta\hat\sigma(\lambda) - \delta V \Vert ,\thickspace \log\Vert \delta\hat\sigma(\lambda) \Vert \bigr).
 $$
 
 The optimal $\lambda$ corresponds to the point of maximum curvature (the "corner"), balancing data fit against solution smoothness.
@@ -154,30 +147,32 @@ The optimal $\lambda$ corresponds to the point of maximum curvature (the "corner
 TV regularisation promotes **piecewise-constant** (edge-preserving) reconstructions:
 
 $$
-\delta\hat\sigma = \arg\min_{\delta\sigma} \left\{ \tfrac{1}{2} \| J \,\delta\sigma - \delta V \|_2^2 + \alpha \| D \,\delta\sigma \|_1 \right\},
+\delta\hat\sigma = \arg\min_{\delta\sigma} \left\lbrace \tfrac{1}{2} \Vert J \thinspace \delta\sigma - \delta V \Vert_2^2 + \alpha \Vert D \thinspace \delta\sigma \Vert_1 \right\rbrace ,
 $$
 
 where $D \in \mathbb{R}^{F \times M}$ is a sparse element-to-element finite difference operator. Each row of $D$ corresponds to a shared interior edge between two elements, with entries $+1$ and $-1$.
 
-The problem is solved via the **Alternating Direction Method of Multipliers (ADMM)** with splitting $z = D\,\delta\sigma$:
+The problem is solved via the **Alternating Direction Method of Multipliers (ADMM)** with splitting $z = D\thinspace\delta\sigma$ and scaled dual variable $u$. Each iteration makes three updates.
 
-- **$\sigma$-update** (quadratic, direct factorisation):
-  $$
-  \delta\sigma^{k+1} = (J^T J + \rho D^T D)^{-1} \bigl( J^T \delta V + \rho D^T (z^k - u^k) \bigr).
-  $$
+**$\sigma$-update** (quadratic, direct factorisation):
 
-- **$z$-update** (element-wise soft-thresholding):
-  $$
-  z^{k+1} = \mathcal{S}_{\alpha/\rho}\bigl( D\,\delta\sigma^{k+1} + u^k \bigr), \qquad
-  \mathcal{S}_\kappa(x) = \operatorname{sgn}(x) \max(|x| - \kappa, 0).
-  $$
+$$
+\delta\sigma^{k+1} = (J^T J + \rho D^T D)^{-1} \bigl( J^T \delta V + \rho D^T (z^k - u^k) \bigr).
+$$
 
-- **$u$-update** (dual ascent):
-  $$
-  u^{k+1} = u^k + D\,\delta\sigma^{k+1} - z^{k+1}.
-  $$
+**$z$-update** (element-wise soft-thresholding):
 
-The penalty parameter $\rho$ is auto-scaled as $\rho = \operatorname{tr}(J^T J) \,/\, \operatorname{tr}(D^T D)$ so that the data-fit and regularisation terms in the augmented Lagrangian have commensurate magnitude. Convergence is declared when the relative primal residual falls below a tolerance.
+$$
+z^{k+1} = \mathcal{S}_{\alpha/\rho}\bigl( D\thinspace\delta\sigma^{k+1} + u^k \bigr), \qquad \mathcal{S}_\kappa(x) = \operatorname{sgn}(x) \max(|x| - \kappa, 0).
+$$
+
+**$u$-update** (dual ascent):
+
+$$
+u^{k+1} = u^k + D\thinspace\delta\sigma^{k+1} - z^{k+1}.
+$$
+
+The penalty parameter $\rho$ is auto-scaled as $\rho = \operatorname{tr}(J^T J) / \operatorname{tr}(D^T D)$ so that the data-fit and regularisation terms in the augmented Lagrangian have commensurate magnitude. Iterations stop when both the primal residual $\lVert D\thinspace\delta\sigma^{k+1} - z^{k+1}\rVert$ and the dual residual $\rho \lVert D^T (z^{k+1} - z^k)\rVert$ fall below tolerances that combine an absolute and a relative part (Boyd et al. 2011, Section 3.3.1).
 
 ---
 
@@ -186,7 +181,7 @@ The penalty parameter $\rho$ is auto-scaled as $\rho = \operatorname{tr}(J^T J) 
 The triangular mesh is generated by a node-relaxation algorithm inspired by Persson & Strang (2004):
 
 1. **Seeding**: a regular hex-grid point cloud fills the unit disc with target edge length $h_0$.
-2. **Boundary nodes**: $N_b = L \lceil 2\pi R / (L h_0) \rceil$ nodes are placed exactly on the circle at uniform angular spacing, so boundary edges are no longer than $h_0$ and every electrode angle $2\pi \ell / L$ is a boundary node. These nodes are held fixed during relaxation, and interior seeds closer than $0.6\,h_0$ to them are removed.
+2. **Boundary nodes**: $N_b = L \lceil 2\pi R / (L h_0) \rceil$ nodes are placed exactly on the circle at uniform angular spacing, so boundary edges are no longer than $h_0$ and every electrode angle $2\pi \ell / L$ is a boundary node. These nodes are held fixed during relaxation, and interior seeds closer than $0.6\thinspace h_0$ to them are removed.
 3. **Relaxation**: free (interior) nodes are repeatedly moved by spring forces (repulsion when edges are shorter than $h_0$, no attraction when longer). Any free node that leaves the disc is projected back onto the circle. Delaunay re-triangulation is performed each iteration.
 4. **Filtering**: triangles whose centroid lies outside the domain are removed.
 5. **CCW enforcement**: all triangles are wound counter-clockwise (positive signed area).
@@ -226,7 +221,7 @@ Once assembled, the Dirichlet-modified stiffness matrix is factorised once via `
 
 ### 6.3 Scaling Considerations
 
-- **Linear regime**: the Born approximation $J\,\delta\sigma \approx \delta V$ requires moderate conductivity contrasts ($|\delta\sigma|/\sigma_0 \lesssim 0.5$). Large contrasts need nonlinear Gauss-Newton iteration (planned for a future release).
+- **Linear regime**: the Born approximation $J\thinspace \delta\sigma \approx \delta V$ requires moderate conductivity contrasts ($|\delta\sigma|/\sigma_0 \lesssim 0.5$). Large contrasts need nonlinear Gauss-Newton iteration (planned for a future release).
 - **Mesh density**: with $h_0 = 0.08$, a typical mesh has $M \approx 1100$ elements and $N \approx 570$ nodes. The forward problem is well-conditioned; the inverse problem has $P = 208$ measurements for $M = 1116$ unknowns (5.4× under-determined).
 
 ---
