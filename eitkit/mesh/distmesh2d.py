@@ -8,7 +8,8 @@ node-relaxation algorithm inspired by the DistMesh method of Persson & Strang
 Algorithm summary
 -----------------
 1. Seed an initial point cloud inside the unit disc on a regular hex grid.
-2. Add the $L$ electrode nodes exactly on the boundary.
+2. Add fixed boundary nodes exactly on the circle, spaced at most ``h0``
+   apart and including the $L$ electrode angles.
 3. Triangulate the points with scipy.spatial.Delaunay.
 4. Remove triangles whose circumcentre lies outside the domain.
 5. Iterate: compute internal "spring" forces along edges, move nodes,
@@ -54,8 +55,10 @@ def make_circle_mesh(
     Parameters
     ----------
     n_electrodes : int
-        Number of electrodes to place on the boundary.  Electrode nodes are
-        fixed on the circle and are never moved during relaxation.
+        Number of electrodes to place on the boundary.  The boundary is
+        resolved by fixed nodes on the circle, spaced at most ``h0`` apart,
+        with one node at each electrode angle; fixed nodes are never moved
+        during relaxation.
     h0 : float
         Target edge length (controls mesh density).  Smaller values produce
         finer meshes.  Typical range: 0.05 (fine) – 0.15 (coarse).
@@ -80,18 +83,23 @@ def make_circle_mesh(
     nodes = _hex_grid(h0, radius)
 
     # ------------------------------------------------------------------
-    # 2. Add electrode nodes exactly on the boundary (fixed during relax)
+    # 2. Add boundary nodes exactly on the circle (fixed during relax).
+    #    Their spacing is at most h0, so the boundary is refined together
+    #    with the interior, and their number is a multiple of n_electrodes,
+    #    so every electrode angle is a boundary node.
     # ------------------------------------------------------------------
-    elec_angles = np.linspace(0.0, 2.0 * np.pi, n_electrodes, endpoint=False)
-    elec_nodes = radius * np.column_stack((np.cos(elec_angles), np.sin(elec_angles)))
-    nodes = np.vstack([nodes, elec_nodes])
+    per_gap = max(1, int(np.ceil(2.0 * np.pi * radius / (h0 * n_electrodes))))
+    n_bnd = per_gap * n_electrodes
+    bnd_angles = 2.0 * np.pi * np.arange(n_bnd) / n_bnd
+    bnd_nodes = radius * np.column_stack((np.cos(bnd_angles), np.sin(bnd_angles)))
+    nodes = np.vstack([nodes, bnd_nodes])
 
-    # Remove interior points that are too close to electrode nodes
-    nodes = _remove_close_points(nodes, h0 * 0.5, n_protect=n_electrodes)
+    # Remove interior points that are too close to boundary nodes
+    nodes = _remove_close_points(nodes, h0 * 0.6, n_protect=n_bnd)
 
-    # n_fixed: electrode nodes are always the last n_electrodes rows
+    # n_fixed: boundary nodes are always the last n_bnd rows
     # (guaranteed by _remove_close_points protecting them)
-    n_fixed = n_electrodes
+    n_fixed = n_bnd
 
     # Add a tiny jitter to break Delaunay degeneracies (but not to fixed nodes)
     jitter = rng.uniform(-1e-4 * h0, 1e-4 * h0, size=(len(nodes) - n_fixed, 2))
@@ -156,9 +164,9 @@ def _remove_close_points(
 ) -> NDArray[np.float64]:
     """Remove points closer than *min_dist* to any later point in the array.
 
-    The last *n_protect* rows are never removed (they are the fixed electrode
-    nodes).  Interior nodes that are too close to an electrode node are
-    removed instead of the electrode node.
+    The last *n_protect* rows are never removed (they are the fixed boundary
+    nodes).  Interior nodes that are too close to a boundary node are
+    removed instead of the boundary node.
     """
     keep = np.ones(len(nodes), dtype=bool)
     n_total = len(nodes)
@@ -168,7 +176,7 @@ def _remove_close_points(
         dists = np.sqrt(np.sum((nodes[i + 1 :] - nodes[i]) ** 2, axis=1))
         too_close = np.where(dists < min_dist)[0] + (i + 1)
         for j in too_close:
-            # Never remove a protected (electrode) node; remove i instead
+            # Never remove a protected (boundary) node; remove i instead
             if j >= n_total - n_protect:
                 keep[i] = False
                 break
@@ -190,13 +198,13 @@ def _relax(
 
     Each edge acts as a spring with rest length proportional to *h0*.
     Boundary nodes are projected onto the circle after each step.
-    Fixed nodes (electrodes) are never moved.
+    Fixed nodes (the boundary nodes) are never moved.
 
     Parameters
     ----------
     nodes : ndarray, shape (N, 2)
     n_fixed : int
-        Number of fixed (electrode) nodes at the *end* of *nodes*.
+        Number of fixed (boundary) nodes at the *end* of *nodes*.
     h0 : float
         Target edge length.
     radius : float
