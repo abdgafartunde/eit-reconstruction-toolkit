@@ -46,3 +46,16 @@ jobs:
                         verify_utils verify_convergence reconstruct_and_plot; do
             python "$GITHUB_WORKSPACE/scripts/$script.py" --outdir "$RUNNER_TEMP/figures"
           done
+
+      - name: Execute the notebooks
+        if: matrix.python-version == '3.13'
+        run: |
+          python - <<'PY'
+          import nbformat
+          from nbclient import NotebookClient
+          for path in ["examples/00_getting_started.ipynb", "examples/01_reconstruction_demo.ipynb"]:
+              nb = nbformat.read(path, as_version=4)
+              NotebookClient(nb, timeout=900, kernel_name="python3",
+                             resources={"metadata": {"path": "examples"}}).execute()
+              print("executed", path)
+          PY

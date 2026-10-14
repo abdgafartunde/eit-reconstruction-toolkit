@@ -52,8 +52,8 @@ coverage.xml
 .pytest_cache/
 cover/
 
-# Generated figures
-figures/
+# figures/ holds sample results committed for the README and tech note
+# (regenerate with scripts/reconstruct_and_plot.py and scripts/verify_convergence.py)
 
 # Translations
 *.mo

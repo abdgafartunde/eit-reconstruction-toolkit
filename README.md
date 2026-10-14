@@ -21,6 +21,17 @@ forward simulation, Jacobian computation, and classical inverse reconstruction.
 
 ---
 
+## Sample results
+
+![Tikhonov and TV reconstructions of a two-inclusion phantom](figures/04_reconstructions.png)
+
+Two inclusions (sigma = 1.6 and 0.5 S/m in a 1 S/m background), 16 electrodes,
+45 dB SNR. TV/ADMM recovers the sharp boundaries that Tikhonov smooths out
+(relative errors 0.427 and 0.579). More figures, and how to regenerate them,
+are in [`figures/`](figures/).
+
+---
+
 ## Installation
 
 Install from source in editable mode:
@@ -75,6 +86,11 @@ sigma_tv  = sigma_ref + dsigma_tv
 
 plot_conductivity(mesh, sigma_tik, title="Tikhonov reconstruction")
 ```
+
+**New to eitkit?** Start with the tutorial,
+[`examples/00_getting_started.ipynb`](examples/00_getting_started.ipynb): it builds
+a complete experiment step by step and covers choosing the regularization
+parameter, testing without the inverse crime, and preparing measured data.
 
 See [`examples/01_reconstruction_demo.ipynb`](examples/01_reconstruction_demo.ipynb)
 for a complete interactive walkthrough with configurable hyperparameters, preset
